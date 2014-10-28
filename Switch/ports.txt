@@ -1,0 +1,35 @@
+echo	TCP	7
+chargen	TCP	19
+ftp-data	TCP	20
+ftp-control	TCP	21
+ssh	TCP	22
+telnet	TCP	23
+smtp	TCP	25
+domain	TCP	53
+finger	TCP	79
+http	TCP	80
+pop3	TCP	110
+sunrpc	TCP	111
+nntp	TCP	119
+netbios-ssn	TCP	139
+imap	TCP	143
+bgp	TCP	179
+ldap	TCP	389
+https	TCP	443
+microsoft-ds	TCP	445
+socks	TCP	1080
+echo	UDP	7
+chargen	UDP	19
+time	UDP	37
+domain	UDP	53
+bootps (DHCP)	UDP	67
+bootpc (DHCP)	UDP	68
+tftp	UDP	69
+netbios-ns	UDP	137
+netbios-dgm	UDP	138
+snmp	UDP	161
+snmp-trap	UDP	162
+isakmp	UDP	500
+syslog	UDP	514
+rip	UDP	520
+traceroute	UDP	33434
