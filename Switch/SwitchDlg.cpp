@@ -85,3 +85,6 @@ HCURSOR CSwitchDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+void CSwitchDlg::OnOK(void)
+{
+}

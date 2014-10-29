@@ -9,6 +9,7 @@
 #endif
 
 #include "resource.h"		// main symbols
+#include <pcap.h>
 
 
 // CSwitchApp:
