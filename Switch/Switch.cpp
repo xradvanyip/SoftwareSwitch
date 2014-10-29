@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "Switch.h"
 #include "SwitchDlg.h"
+#include "InitDlg.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -70,13 +71,13 @@ BOOL CSwitchApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	CSwitchDlg dlg;
-	m_pMainWnd = &dlg;
-	INT_PTR nResponse = dlg.DoModal();
+	CInitDlg init_dlg;
+	INT_PTR nResponse = init_dlg.DoModal();
 	if (nResponse == IDOK)
 	{
-		// TODO: Place code here to handle when the dialog is
-		//  dismissed with OK
+		CSwitchDlg switch_dlg;
+		m_pMainWnd = &switch_dlg;
+		switch_dlg.DoModal();
 	}
 	else if (nResponse == IDCANCEL)
 	{
