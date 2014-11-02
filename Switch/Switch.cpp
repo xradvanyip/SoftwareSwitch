@@ -22,6 +22,8 @@ END_MESSAGE_MAP()
 // CSwitchApp construction
 
 CSwitchApp::CSwitchApp()
+	: Port1(1)
+	, Port2(2)
 {
 	// support Restart Manager
 	m_dwRestartManagerSupportFlags = AFX_RESTART_MANAGER_SUPPORT_RESTART;
@@ -101,3 +103,15 @@ BOOL CSwitchApp::InitInstance()
 	return FALSE;
 }
 
+
+
+SwitchPort & CSwitchApp::GetPort1(void)
+{
+	return Port1;
+}
+
+
+SwitchPort & CSwitchApp::GetPort2(void)
+{
+	return Port2;
+}

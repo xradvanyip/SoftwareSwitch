@@ -25,11 +25,27 @@ CSwitchDlg::CSwitchDlg(CWnd* pParent /*=NULL*/)
 void CSwitchDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
+	DDX_Control(pDX, IDC_PORT1DESC, m_port1desc);
+	DDX_Control(pDX, IDC_PORT1MACADDR, m_port1macaddr);
+	DDX_Control(pDX, IDC_PORT1MODECOMBO, m_port1mode);
+	DDX_Control(pDX, IDC_PORT1VLANCOMBO, m_port1accessvlan);
+	DDX_Control(pDX, IDC_PORT1VLANSBUTTON, m_port1vlansbutton);
+	DDX_Control(pDX, IDC_PORT2DESC, m_port2desc);
+	DDX_Control(pDX, IDC_PORT2MACADDR, m_port2macaddr);
+	DDX_Control(pDX, IDC_PORT2MODECOMBO, m_port2mode);
+	DDX_Control(pDX, IDC_PORT2VLANCOMBO, m_port2accessvlan);
+	DDX_Control(pDX, IDC_PORT2VLANSBUTTON, m_port2vlansbutton);
 }
 
 BEGIN_MESSAGE_MAP(CSwitchDlg, CDialog)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_CBN_SELCHANGE(IDC_PORT1MODECOMBO, &CSwitchDlg::OnPort1ModeChange)
+	ON_CBN_SELCHANGE(IDC_PORT2MODECOMBO, &CSwitchDlg::OnPort2ModeChange)
+	ON_CBN_SELCHANGE(IDC_PORT1VLANCOMBO, &CSwitchDlg::OnPort1VLANChange)
+	ON_CBN_SELCHANGE(IDC_PORT2VLANCOMBO, &CSwitchDlg::OnPort2VLANChange)
+	ON_BN_CLICKED(IDC_PORT1VLANSBUTTON, &CSwitchDlg::OnBnClickedPort1VLANs)
+	ON_BN_CLICKED(IDC_PORT2VLANSBUTTON, &CSwitchDlg::OnBnClickedPort2VLANs)
 END_MESSAGE_MAP()
 
 
@@ -45,6 +61,20 @@ BOOL CSwitchDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	// TODO: Add extra initialization here
+	m_port1macaddr.SetWindowTextW(theApp.GetPort1().GetMACAddress());
+	m_port2macaddr.SetWindowTextW(theApp.GetPort2().GetMACAddress());
+	
+	m_port1desc.SetWindowTextW(theApp.GetPort1().GetDescription());
+	m_port2desc.SetWindowTextW(theApp.GetPort2().GetDescription());
+		
+	m_port1mode.SetCurSel(0);
+	m_port2mode.SetCurSel(0);
+
+	m_port1accessvlan.SetCurSel(0);
+	m_port2accessvlan.SetCurSel(0);
+
+	m_port1vlansbutton.EnableWindow(FALSE);
+	m_port2vlansbutton.EnableWindow(FALSE);
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -87,4 +117,61 @@ HCURSOR CSwitchDlg::OnQueryDragIcon()
 
 void CSwitchDlg::OnOK(void)
 {
+}
+
+void CSwitchDlg::OnPort1ModeChange()
+{
+	if (m_port1mode.GetCurSel() == 0)
+	{
+		theApp.GetPort1().SetMode(ACCESS);
+		m_port1accessvlan.EnableWindow(TRUE);
+		m_port1vlansbutton.EnableWindow(FALSE);
+	}
+	else
+	{
+		theApp.GetPort1().SetMode(TRUNK);
+		m_port1accessvlan.EnableWindow(FALSE);
+		m_port1vlansbutton.EnableWindow(TRUE);
+	}
+}
+
+
+void CSwitchDlg::OnPort2ModeChange()
+{
+	if (m_port2mode.GetCurSel() == 0)
+	{
+		theApp.GetPort2().SetMode(ACCESS);
+		m_port2accessvlan.EnableWindow(TRUE);
+		m_port2vlansbutton.EnableWindow(FALSE);
+	}
+	else
+	{
+		theApp.GetPort2().SetMode(TRUNK);
+		m_port2accessvlan.EnableWindow(FALSE);
+		m_port2vlansbutton.EnableWindow(TRUE);
+	}
+}
+
+
+void CSwitchDlg::OnPort1VLANChange()
+{
+	// TODO: Add your control notification handler code here
+}
+
+
+void CSwitchDlg::OnPort2VLANChange()
+{
+	// TODO: Add your control notification handler code here
+}
+
+
+void CSwitchDlg::OnBnClickedPort1VLANs()
+{
+	// TODO: Add your control notification handler code here
+}
+
+
+void CSwitchDlg::OnBnClickedPort2VLANs()
+{
+	// TODO: Add your control notification handler code here
 }

@@ -9,6 +9,7 @@
 #endif
 
 #include "resource.h"		// main symbols
+#include "SwitchPort.h"
 #include <pcap.h>
 
 
@@ -28,6 +29,12 @@ public:
 // Implementation
 
 	DECLARE_MESSAGE_MAP()
+private:
+	SwitchPort Port1;
+	SwitchPort Port2;
+public:
+	SwitchPort & GetPort1(void);
+	SwitchPort & GetPort2(void);
 };
 
 extern CSwitchApp theApp;
