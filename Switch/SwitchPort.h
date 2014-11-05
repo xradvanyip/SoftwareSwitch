@@ -2,8 +2,9 @@
 #pragma comment(lib, "iphlpapi.lib")
 
 #include <IPHlpApi.h>
+#include "MACtable.h"
 
-typedef enum {ACCESS, TRUNK} PORT_MODE;
+enum PORT_MODE {ACCESS, TRUNK};
 
 class SwitchPort
 {
@@ -15,6 +16,7 @@ private:
 	CStringA PortName;
 	CString PortDescription;
 	CString MACAddress;
+	MACaddr MACAddrStruct;
 	PORT_MODE Mode;
 	static PIP_ADAPTER_ADDRESSES AdaptersInfoBuffer;
 public:
@@ -29,5 +31,6 @@ public:
 	int GetIndex(void);
 	void SetMode(PORT_MODE mode);
 	PORT_MODE GetMode(void);
+	MACaddr GetMACAddrStruct(void);
 };
 

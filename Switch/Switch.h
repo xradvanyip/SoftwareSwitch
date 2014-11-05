@@ -9,7 +9,9 @@
 #endif
 
 #include "resource.h"		// main symbols
+#include "SwitchDlg.h"
 #include "SwitchPort.h"
+#include "MACtable.h"
 #include <pcap.h>
 
 
@@ -32,9 +34,12 @@ public:
 private:
 	SwitchPort Port1;
 	SwitchPort Port2;
+	MACtable MACTab;
 public:
 	SwitchPort & GetPort1(void);
 	SwitchPort & GetPort2(void);
+	CSwitchDlg * GetSwitchDlg(void);
+	MACtable & GetMACtab(void);
 };
 
 extern CSwitchApp theApp;

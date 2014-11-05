@@ -39,6 +39,12 @@
     <ClInclude Include="SwitchPort.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MACtable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FixListCtrl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Switch.cpp">
@@ -54,6 +60,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="SwitchPort.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MACtable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FixListCtrl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

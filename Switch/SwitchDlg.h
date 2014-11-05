@@ -4,6 +4,9 @@
 
 #pragma once
 #include "afxwin.h"
+#include "afxcmn.h"
+#include "FixListCtrl.h"
+#include "MACtable.h"
 
 
 // CSwitchDlg dialog
@@ -43,6 +46,10 @@ private:
 	CComboBox m_port2mode;
 	CComboBox m_port2accessvlan;
 	CButton m_port2vlansbutton;
+	
+	CFixListCtrl m_mactable;
+	CEdit m_timeout;
+	CSpinButtonCtrl m_timeoutspin;
 public:
 	afx_msg void OnPort1ModeChange();
 	afx_msg void OnPort2ModeChange();
@@ -50,4 +57,15 @@ public:
 	afx_msg void OnPort2VLANChange();
 	afx_msg void OnBnClickedPort1VLANs();
 	afx_msg void OnBnClickedPort2VLANs();
+private:
+	void InitPortsInfo(void);
+	void InitMACtable(void);
+public:
+	void InstertToMACTab(StoredMAC s);
+	void DeleteFromMACTab(int index);
+	void ModifyMACTab(int index, StoredMAC s);
+	void UpdateTimeout(int index, UINT timeout);
+public:
+	afx_msg void OnDeltaposTimeoutspin(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 };

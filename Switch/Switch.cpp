@@ -4,7 +4,6 @@
 
 #include "stdafx.h"
 #include "Switch.h"
-#include "SwitchDlg.h"
 #include "InitDlg.h"
 
 #ifdef _DEBUG
@@ -114,4 +113,16 @@ SwitchPort & CSwitchApp::GetPort1(void)
 SwitchPort & CSwitchApp::GetPort2(void)
 {
 	return Port2;
+}
+
+
+CSwitchDlg * CSwitchApp::GetSwitchDlg(void)
+{
+	return (CSwitchDlg *)m_pMainWnd;
+}
+
+
+MACtable & CSwitchApp::GetMACtab(void)
+{
+	return MACTab;
 }

@@ -9,7 +9,10 @@ SwitchPort::SwitchPort(int index)
 	: MACAddress(_T("unknown"))
 	, PortIndex(index)
 {
+	int i;
+
 	Mode = ACCESS;
+	for (i=0;i < 6;i++) MACAddrStruct.b[i] = 0x00;
 }
 
 
@@ -98,6 +101,7 @@ CString SwitchPort::GetMACAddress(void)
 				for (i=0;i < (int)CurrentAdapter->PhysicalAddressLength;i++) {
 					if (i == (CurrentAdapter->PhysicalAddressLength - 1)) MACAddress.AppendFormat(_T("%.2X"),(int)CurrentAdapter->PhysicalAddress[i]);
 					else MACAddress.AppendFormat(_T("%.2X-"),(int)CurrentAdapter->PhysicalAddress[i]);
+					if (i < 6) MACAddrStruct.b[i] = (int)CurrentAdapter->PhysicalAddress[i];
 				}
 				break;
 			}
@@ -127,4 +131,10 @@ void SwitchPort::SetMode(PORT_MODE mode)
 PORT_MODE SwitchPort::GetMode(void)
 {
 	return Mode;
+}
+
+
+MACaddr SwitchPort::GetMACAddrStruct(void)
+{
+	return MACAddrStruct;
 }

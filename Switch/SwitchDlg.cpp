@@ -35,6 +35,9 @@ void CSwitchDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_PORT2MODECOMBO, m_port2mode);
 	DDX_Control(pDX, IDC_PORT2VLANCOMBO, m_port2accessvlan);
 	DDX_Control(pDX, IDC_PORT2VLANSBUTTON, m_port2vlansbutton);
+	DDX_Control(pDX, IDC_LIST1, m_mactable);
+	DDX_Control(pDX, IDC_TIMEOUT, m_timeout);
+	DDX_Control(pDX, IDC_TIMEOUTSPIN, m_timeoutspin);
 }
 
 BEGIN_MESSAGE_MAP(CSwitchDlg, CDialog)
@@ -46,6 +49,8 @@ BEGIN_MESSAGE_MAP(CSwitchDlg, CDialog)
 	ON_CBN_SELCHANGE(IDC_PORT2VLANCOMBO, &CSwitchDlg::OnPort2VLANChange)
 	ON_BN_CLICKED(IDC_PORT1VLANSBUTTON, &CSwitchDlg::OnBnClickedPort1VLANs)
 	ON_BN_CLICKED(IDC_PORT2VLANSBUTTON, &CSwitchDlg::OnBnClickedPort2VLANs)
+	ON_NOTIFY(UDN_DELTAPOS, IDC_TIMEOUTSPIN, &CSwitchDlg::OnDeltaposTimeoutspin)
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 
@@ -61,20 +66,9 @@ BOOL CSwitchDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	// TODO: Add extra initialization here
-	m_port1macaddr.SetWindowTextW(theApp.GetPort1().GetMACAddress());
-	m_port2macaddr.SetWindowTextW(theApp.GetPort2().GetMACAddress());
-	
-	m_port1desc.SetWindowTextW(theApp.GetPort1().GetDescription());
-	m_port2desc.SetWindowTextW(theApp.GetPort2().GetDescription());
-		
-	m_port1mode.SetCurSel(0);
-	m_port2mode.SetCurSel(0);
-
-	m_port1accessvlan.SetCurSel(0);
-	m_port2accessvlan.SetCurSel(0);
-
-	m_port1vlansbutton.EnableWindow(FALSE);
-	m_port2vlansbutton.EnableWindow(FALSE);
+	InitPortsInfo();
+	InitMACtable();
+	SetTimer(1,5000,NULL);
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -115,9 +109,46 @@ HCURSOR CSwitchDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+
 void CSwitchDlg::OnOK(void)
 {
 }
+
+
+void CSwitchDlg::InitPortsInfo(void)
+{
+	m_port1macaddr.SetWindowTextW(theApp.GetPort1().GetMACAddress());
+	m_port2macaddr.SetWindowTextW(theApp.GetPort2().GetMACAddress());
+	
+	m_port1desc.SetWindowTextW(theApp.GetPort1().GetDescription());
+	m_port2desc.SetWindowTextW(theApp.GetPort2().GetDescription());
+		
+	m_port1mode.SetCurSel(0);
+	m_port2mode.SetCurSel(0);
+
+	m_port1accessvlan.SetCurSel(0);
+	m_port2accessvlan.SetCurSel(0);
+
+	m_port1vlansbutton.EnableWindow(FALSE);
+	m_port2vlansbutton.EnableWindow(FALSE);
+}
+
+
+void CSwitchDlg::InitMACtable(void)
+{
+	CString tmp;
+	
+	m_mactable.SetExtendedStyle(m_mactable.GetExtendedStyle() | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
+	m_mactable.InsertColumn(0,_T("Port"),LVCFMT_CENTER,32);
+	m_mactable.InsertColumn(1,_T("MAC Address"),LVCFMT_CENTER,124);
+	m_mactable.InsertColumn(2,_T("Timeout"),LVCFMT_CENTER,50);
+
+	m_timeoutspin.SetRange(2,1199);
+	m_timeoutspin.SetPos(theApp.GetMACtab().GetTimeOut() / 5);
+	tmp.Format(_T("%.2d:%.2d"),theApp.GetMACtab().GetTimeOut() / 60, theApp.GetMACtab().GetTimeOut() % 60);
+	m_timeout.SetWindowTextW(tmp);
+}
+
 
 void CSwitchDlg::OnPort1ModeChange()
 {
@@ -168,10 +199,79 @@ void CSwitchDlg::OnPort2VLANChange()
 void CSwitchDlg::OnBnClickedPort1VLANs()
 {
 	// TODO: Add your control notification handler code here
+	CString str;
+	str.Format(_T("%d %d %d count:%d"),m_mactable.GetColumnWidth(0),m_mactable.GetColumnWidth(1),m_mactable.GetColumnWidth(2),m_mactable.GetItemCount());
+	AfxMessageBox(str);
 }
 
 
 void CSwitchDlg::OnBnClickedPort2VLANs()
 {
 	// TODO: Add your control notification handler code here
+	theApp.GetMACtab().Add(1,theApp.GetPort1().GetMACAddrStruct());
+	theApp.GetMACtab().Add(2,theApp.GetPort2().GetMACAddrStruct());
+}
+
+
+void CSwitchDlg::InstertToMACTab(StoredMAC s)
+{
+	int index = m_mactable.GetItemCount();
+	CString tmp;
+	
+	tmp.Format(_T("%d"),s.port);
+	m_mactable.InsertItem(index,tmp);
+	tmp.Format(_T("%.2X:%.2X:%.2X:%.2X:%.2X:%.2X"),s.address.b[0],s.address.b[1],s.address.b[2],s.address.b[3],s.address.b[4],s.address.b[5]);
+	m_mactable.SetItemText(index,1,tmp);
+	tmp.Format(_T("%.2d:%.2d"),s.SecondsLeft / 60, s.SecondsLeft % 60);
+	m_mactable.SetItemText(index,2,tmp);
+}
+
+
+void CSwitchDlg::DeleteFromMACTab(int index)
+{
+	m_mactable.DeleteItem(index);
+}
+
+
+void CSwitchDlg::ModifyMACTab(int index, StoredMAC s)
+{
+	CString tmp;
+	
+	DeleteFromMACTab(index);
+	tmp.Format(_T("%d"),s.port);
+	m_mactable.InsertItem(index,tmp);
+	tmp.Format(_T("%.2X:%.2X:%.2X:%.2X:%.2X:%.2X"),s.address.b[0],s.address.b[1],s.address.b[2],s.address.b[3],s.address.b[4],s.address.b[5]);
+	m_mactable.SetItemText(index,1,tmp);
+	tmp.Format(_T("%.2d:%.2d"),s.SecondsLeft / 60, s.SecondsLeft % 60);
+	m_mactable.SetItemText(index,2,tmp);
+}
+
+
+void CSwitchDlg::UpdateTimeout(int index, UINT timeout)
+{
+	CString tmp;
+
+	tmp.Format(_T("%.2d:%.2d"),timeout / 60, timeout % 60);
+	m_mactable.SetItemText(index,2,tmp);
+}
+
+
+void CSwitchDlg::OnDeltaposTimeoutspin(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	LPNMUPDOWN pNMUpDown = reinterpret_cast<LPNMUPDOWN>(pNMHDR);
+	CString tmp;
+	UINT seconds = (UINT)pNMUpDown->iPos * 5;
+	
+	theApp.GetMACtab().SetTimeOut(seconds);
+	tmp.Format(_T("%.2d:%.2d"),seconds / 60, seconds % 60);
+	m_timeout.SetWindowTextW(tmp);
+	*pResult = 0;
+}
+
+
+void CSwitchDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	theApp.GetMACtab().Maintain();
+
+	CDialog::OnTimer(nIDEvent);
 }
