@@ -3,6 +3,7 @@
 
 #include <IPHlpApi.h>
 #include "MACtable.h"
+#include "frame.h"
 
 enum PORT_MODE {ACCESS, TRUNK};
 
@@ -19,6 +20,7 @@ private:
 	MACaddr MACAddrStruct;
 	PORT_MODE Mode;
 	static PIP_ADAPTER_ADDRESSES AdaptersInfoBuffer;
+	Frame *bufferedFrame;
 public:
 	CStringA GetName(void);
 	CString GetDescription(void);
@@ -32,5 +34,6 @@ public:
 	void SetMode(PORT_MODE mode);
 	PORT_MODE GetMode(void);
 	MACaddr GetMACAddrStruct(void);
+	Frame * GetBuffer(void);
 };
 

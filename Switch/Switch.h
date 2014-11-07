@@ -13,6 +13,13 @@
 #include "SwitchPort.h"
 #include "MACtable.h"
 #include <pcap.h>
+#include "Frame.h"
+
+
+//struct ThreadParam {
+//	int port;
+//	CSwitchApp *app;
+//};
 
 
 // CSwitchApp:
@@ -34,12 +41,14 @@ public:
 private:
 	SwitchPort Port1;
 	SwitchPort Port2;
-	MACtable MACTab;
+	MACtable *MACTab;
 public:
 	SwitchPort & GetPort1(void);
 	SwitchPort & GetPort2(void);
 	CSwitchDlg * GetSwitchDlg(void);
-	MACtable & GetMACtab(void);
+	MACtable * GetMACtab(void);
+	static UINT ReceiveThread(void * pParam);
+	void StartThreads(void);
 };
 
 extern CSwitchApp theApp;

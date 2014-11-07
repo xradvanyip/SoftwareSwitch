@@ -8,6 +8,10 @@
 #include "FixListCtrl.h"
 #include "MACtable.h"
 
+#define WM_INSERTTOMAC_MESSAGE WM_APP+100
+#define WM_DELETEFROMMAC_MESSAGE WM_APP+101
+#define WM_MODIFYMAC_MESSAGE WM_APP+102
+#define WM_UPDATETIMEOUT_MESSAGE WM_APP+103
 
 // CSwitchDlg dialog
 class CSwitchDlg : public CDialog
@@ -50,6 +54,9 @@ private:
 	CFixListCtrl m_mactable;
 	CEdit m_timeout;
 	CSpinButtonCtrl m_timeoutspin;
+
+	void InitPortsInfo(void);
+	void InitMACtable(void);
 public:
 	afx_msg void OnPort1ModeChange();
 	afx_msg void OnPort2ModeChange();
@@ -57,15 +64,15 @@ public:
 	afx_msg void OnPort2VLANChange();
 	afx_msg void OnBnClickedPort1VLANs();
 	afx_msg void OnBnClickedPort2VLANs();
-private:
-	void InitPortsInfo(void);
-	void InitMACtable(void);
-public:
 	void InstertToMACTab(StoredMAC s);
 	void DeleteFromMACTab(int index);
 	void ModifyMACTab(int index, StoredMAC s);
 	void UpdateTimeout(int index, UINT timeout);
-public:
 	afx_msg void OnDeltaposTimeoutspin(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+protected:
+	afx_msg LRESULT OnInsertToMacMessage(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT OnDeleteFromMacMessage(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT OnModifyMacMessage(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT OnUpdateTimeoutMessage(WPARAM wParam, LPARAM lParam);
 };

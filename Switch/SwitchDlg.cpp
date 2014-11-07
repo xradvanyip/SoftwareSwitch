@@ -51,6 +51,10 @@ BEGIN_MESSAGE_MAP(CSwitchDlg, CDialog)
 	ON_BN_CLICKED(IDC_PORT2VLANSBUTTON, &CSwitchDlg::OnBnClickedPort2VLANs)
 	ON_NOTIFY(UDN_DELTAPOS, IDC_TIMEOUTSPIN, &CSwitchDlg::OnDeltaposTimeoutspin)
 	ON_WM_TIMER()
+	ON_MESSAGE(WM_INSERTTOMAC_MESSAGE, &CSwitchDlg::OnInsertToMacMessage)
+	ON_MESSAGE(WM_DELETEFROMMAC_MESSAGE, &CSwitchDlg::OnDeleteFromMacMessage)
+	ON_MESSAGE(WM_MODIFYMAC_MESSAGE, &CSwitchDlg::OnModifyMacMessage)
+	ON_MESSAGE(WM_UPDATETIMEOUT_MESSAGE, &CSwitchDlg::OnUpdateTimeoutMessage)
 END_MESSAGE_MAP()
 
 
@@ -69,6 +73,7 @@ BOOL CSwitchDlg::OnInitDialog()
 	InitPortsInfo();
 	InitMACtable();
 	SetTimer(1,5000,NULL);
+	theApp.StartThreads();
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -144,8 +149,8 @@ void CSwitchDlg::InitMACtable(void)
 	m_mactable.InsertColumn(2,_T("Timeout"),LVCFMT_CENTER,50);
 
 	m_timeoutspin.SetRange(2,1199);
-	m_timeoutspin.SetPos(theApp.GetMACtab().GetTimeOut() / 5);
-	tmp.Format(_T("%.2d:%.2d"),theApp.GetMACtab().GetTimeOut() / 60, theApp.GetMACtab().GetTimeOut() % 60);
+	m_timeoutspin.SetPos(theApp.GetMACtab()->GetTimeOut() / 5);
+	tmp.Format(_T("%.2d:%.2d"),theApp.GetMACtab()->GetTimeOut() / 60, theApp.GetMACtab()->GetTimeOut() % 60);
 	m_timeout.SetWindowTextW(tmp);
 }
 
@@ -208,51 +213,44 @@ void CSwitchDlg::OnBnClickedPort1VLANs()
 void CSwitchDlg::OnBnClickedPort2VLANs()
 {
 	// TODO: Add your control notification handler code here
-	theApp.GetMACtab().Add(1,theApp.GetPort1().GetMACAddrStruct());
-	theApp.GetMACtab().Add(2,theApp.GetPort2().GetMACAddrStruct());
+	theApp.GetMACtab()->Add(1,theApp.GetPort1().GetMACAddrStruct());
+	theApp.GetMACtab()->Add(2,theApp.GetPort2().GetMACAddrStruct());
 }
 
 
 void CSwitchDlg::InstertToMACTab(StoredMAC s)
 {
-	int index = m_mactable.GetItemCount();
-	CString tmp;
-	
-	tmp.Format(_T("%d"),s.port);
-	m_mactable.InsertItem(index,tmp);
-	tmp.Format(_T("%.2X:%.2X:%.2X:%.2X:%.2X:%.2X"),s.address.b[0],s.address.b[1],s.address.b[2],s.address.b[3],s.address.b[4],s.address.b[5]);
-	m_mactable.SetItemText(index,1,tmp);
-	tmp.Format(_T("%.2d:%.2d"),s.SecondsLeft / 60, s.SecondsLeft % 60);
-	m_mactable.SetItemText(index,2,tmp);
+	StoredMAC *sptr = (StoredMAC *) malloc(sizeof(StoredMAC));
+	*sptr = s;
+	SendMessage(WM_INSERTTOMAC_MESSAGE,0,(LPARAM)sptr);
 }
 
 
 void CSwitchDlg::DeleteFromMACTab(int index)
 {
-	m_mactable.DeleteItem(index);
+	int *indexptr = (int *) malloc(sizeof(int));
+	*indexptr = index;
+	SendMessage(WM_DELETEFROMMAC_MESSAGE,0,(LPARAM)indexptr);
 }
 
 
 void CSwitchDlg::ModifyMACTab(int index, StoredMAC s)
 {
-	CString tmp;
-	
-	DeleteFromMACTab(index);
-	tmp.Format(_T("%d"),s.port);
-	m_mactable.InsertItem(index,tmp);
-	tmp.Format(_T("%.2X:%.2X:%.2X:%.2X:%.2X:%.2X"),s.address.b[0],s.address.b[1],s.address.b[2],s.address.b[3],s.address.b[4],s.address.b[5]);
-	m_mactable.SetItemText(index,1,tmp);
-	tmp.Format(_T("%.2d:%.2d"),s.SecondsLeft / 60, s.SecondsLeft % 60);
-	m_mactable.SetItemText(index,2,tmp);
+	int *indexptr = (int *) malloc(sizeof(int));
+	StoredMAC *sptr = (StoredMAC *) malloc(sizeof(StoredMAC));
+	*indexptr = index;
+	*sptr = s;
+	SendMessage(WM_MODIFYMAC_MESSAGE,(WPARAM)indexptr,(LPARAM)sptr);
 }
 
 
 void CSwitchDlg::UpdateTimeout(int index, UINT timeout)
 {
-	CString tmp;
-
-	tmp.Format(_T("%.2d:%.2d"),timeout / 60, timeout % 60);
-	m_mactable.SetItemText(index,2,tmp);
+	int *indexptr = (int *) malloc(sizeof(int));
+	UINT *timeoutptr = (UINT *) malloc(sizeof(UINT));
+	*indexptr = index;
+	*timeoutptr = timeout;
+	SendMessage(WM_UPDATETIMEOUT_MESSAGE,(WPARAM)indexptr,(LPARAM)timeoutptr);
 }
 
 
@@ -262,7 +260,7 @@ void CSwitchDlg::OnDeltaposTimeoutspin(NMHDR *pNMHDR, LRESULT *pResult)
 	CString tmp;
 	UINT seconds = (UINT)pNMUpDown->iPos * 5;
 	
-	theApp.GetMACtab().SetTimeOut(seconds);
+	theApp.GetMACtab()->SetTimeOut(seconds);
 	tmp.Format(_T("%.2d:%.2d"),seconds / 60, seconds % 60);
 	m_timeout.SetWindowTextW(tmp);
 	*pResult = 0;
@@ -271,7 +269,70 @@ void CSwitchDlg::OnDeltaposTimeoutspin(NMHDR *pNMHDR, LRESULT *pResult)
 
 void CSwitchDlg::OnTimer(UINT_PTR nIDEvent)
 {
-	theApp.GetMACtab().Maintain();
+	theApp.GetMACtab()->Maintain();
 
 	CDialog::OnTimer(nIDEvent);
+}
+
+
+afx_msg LRESULT CSwitchDlg::OnInsertToMacMessage(WPARAM wParam, LPARAM lParam)
+{
+	StoredMAC *s = (StoredMAC *)lParam;
+	int index = m_mactable.GetItemCount();
+	CString tmp;
+	
+	tmp.Format(_T("%d"),s->port);
+	m_mactable.InsertItem(index,tmp);
+	tmp.Format(_T("%.2X:%.2X:%.2X:%.2X:%.2X:%.2X"),s->address.b[0],s->address.b[1],s->address.b[2],s->address.b[3],s->address.b[4],s->address.b[5]);
+	m_mactable.SetItemText(index,1,tmp);
+	tmp.Format(_T("%.2d:%.2d"),s->SecondsLeft / 60, s->SecondsLeft % 60);
+	m_mactable.SetItemText(index,2,tmp);
+	free(s);
+	
+	return 0;
+}
+
+
+afx_msg LRESULT CSwitchDlg::OnDeleteFromMacMessage(WPARAM wParam, LPARAM lParam)
+{
+	int *index = (int *)lParam;
+	m_mactable.DeleteItem(*index);
+	free(index);
+	
+	return 0;
+}
+
+
+afx_msg LRESULT CSwitchDlg::OnModifyMacMessage(WPARAM wParam, LPARAM lParam)
+{
+	int *index = (int *)wParam;
+	StoredMAC *s = (StoredMAC *)lParam;
+	CString tmp;
+	
+	m_mactable.DeleteItem(*index);
+	tmp.Format(_T("%d"),s->port);
+	m_mactable.InsertItem(*index,tmp);
+	tmp.Format(_T("%.2X:%.2X:%.2X:%.2X:%.2X:%.2X"),s->address.b[0],s->address.b[1],s->address.b[2],s->address.b[3],s->address.b[4],s->address.b[5]);
+	m_mactable.SetItemText(*index,1,tmp);
+	tmp.Format(_T("%.2d:%.2d"),s->SecondsLeft / 60, s->SecondsLeft % 60);
+	m_mactable.SetItemText(*index,2,tmp);
+	free(index);
+	free(s);
+	
+	return 0;
+}
+
+
+afx_msg LRESULT CSwitchDlg::OnUpdateTimeoutMessage(WPARAM wParam, LPARAM lParam)
+{
+	int *index = (int *)wParam;
+	UINT *timeout = (UINT *)lParam;
+	CString tmp;
+
+	tmp.Format(_T("%.2d:%.2d"),*timeout / 60, *timeout % 60);
+	m_mactable.SetItemText(*index,2,tmp);
+	free(index);
+	free(timeout);
+	
+	return 0;
 }

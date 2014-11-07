@@ -72,6 +72,8 @@ BOOL CSwitchApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
+	MACTab = new MACtable();
+	
 	CInitDlg init_dlg;
 	INT_PTR nResponse = init_dlg.DoModal();
 	if (nResponse == IDOK)
@@ -122,7 +124,49 @@ CSwitchDlg * CSwitchApp::GetSwitchDlg(void)
 }
 
 
-MACtable & CSwitchApp::GetMACtab(void)
+MACtable * CSwitchApp::GetMACtab(void)
 {
 	return MACTab;
+}
+
+
+UINT CSwitchApp::ReceiveThread(void * pParam)
+{
+	SwitchPort *port = (SwitchPort *) pParam;
+	MACtable *table = theApp.GetMACtab();
+	Frame *buffer = port->GetBuffer();
+	pcap_t *handle;
+	char errbuf[PCAP_ERRBUF_SIZE];
+	CStringA errorstring;
+	int flag = PCAP_OPENFLAG_PROMISCUOUS | PCAP_OPENFLAG_NOCAPTURE_LOCAL | PCAP_OPENFLAG_MAX_RESPONSIVENESS;
+	pcap_pkthdr *header = NULL;
+	const u_char *frame = NULL;
+	int retval;
+	
+	handle = pcap_open(port->GetName(),65536,flag,1000,NULL,errbuf);
+	if (!handle)
+	{
+		errorstring.Format("Unable to open the adapter on PORT %d!\n%s",port->GetIndex(),errbuf);
+		theApp.GetSwitchDlg()->MessageBox(CString(errorstring),_T("Error"),MB_ICONERROR);
+		return 0;
+	}
+	while((retval = pcap_next_ex(handle,&header,&frame)) >= 0)
+	{
+		if (retval == 0) continue;
+		buffer->AddFrame(frame);
+	}
+	if (retval == -1)
+	{
+		errorstring.Format("Error receiving the packets on PORT %d!\n%s",port->GetIndex(),pcap_geterr(handle));
+		theApp.GetSwitchDlg()->MessageBox(CString(errorstring),_T("Error"),MB_ICONERROR);
+	}
+
+	return 0;
+}
+
+
+void CSwitchApp::StartThreads(void)
+{
+	AfxBeginThread(CSwitchApp::ReceiveThread,&Port1);
+	AfxBeginThread(CSwitchApp::ReceiveThread,&Port2);
 }
