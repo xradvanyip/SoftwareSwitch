@@ -13,7 +13,7 @@ SwitchPort::SwitchPort(int index)
 
 	Mode = ACCESS;
 	for (i=0;i < 6;i++) MACAddrStruct.b[i] = 0x00;
-	bufferedFrame = new Frame();
+	FrameBuffer = new Frame();
 }
 
 
@@ -143,5 +143,5 @@ MACaddr SwitchPort::GetMACAddrStruct(void)
 
 Frame * SwitchPort::GetBuffer(void)
 {
-	return bufferedFrame;
+	return FrameBuffer;
 }

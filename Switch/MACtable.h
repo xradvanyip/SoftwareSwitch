@@ -30,5 +30,6 @@ public:
 	void Maintain(void);
 	UINT GetTimeOut(void);
 	void SetTimeOut(UINT seconds);
+	int IsBroadcast(MACaddr& address);
 };
 

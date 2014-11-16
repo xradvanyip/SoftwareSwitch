@@ -16,10 +16,10 @@
 #include "Frame.h"
 
 
-//struct ThreadParam {
-//	int port;
-//	CSwitchApp *app;
-//};
+struct SendThreadParam {
+	pcap_t *handle;
+	SwitchPort *port;
+};
 
 
 // CSwitchApp:
@@ -39,15 +39,16 @@ public:
 
 	DECLARE_MESSAGE_MAP()
 private:
-	SwitchPort Port1;
-	SwitchPort Port2;
+	SwitchPort *Port1;
+	SwitchPort *Port2;
 	MACtable *MACTab;
 public:
-	SwitchPort & GetPort1(void);
-	SwitchPort & GetPort2(void);
+	SwitchPort * GetPort1(void);
+	SwitchPort * GetPort2(void);
 	CSwitchDlg * GetSwitchDlg(void);
 	MACtable * GetMACtab(void);
 	static UINT ReceiveThread(void * pParam);
+	static UINT SendThread(void * pParam);
 	void StartThreads(void);
 };
 

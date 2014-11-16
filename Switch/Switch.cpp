@@ -21,8 +21,6 @@ END_MESSAGE_MAP()
 // CSwitchApp construction
 
 CSwitchApp::CSwitchApp()
-	: Port1(1)
-	, Port2(2)
 {
 	// support Restart Manager
 	m_dwRestartManagerSupportFlags = AFX_RESTART_MANAGER_SUPPORT_RESTART;
@@ -73,6 +71,8 @@ BOOL CSwitchApp::InitInstance()
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
 	MACTab = new MACtable();
+	Port1 = new SwitchPort(1);
+	Port2 = new SwitchPort(2);
 	
 	CInitDlg init_dlg;
 	INT_PTR nResponse = init_dlg.DoModal();
@@ -106,13 +106,13 @@ BOOL CSwitchApp::InitInstance()
 
 
 
-SwitchPort & CSwitchApp::GetPort1(void)
+SwitchPort * CSwitchApp::GetPort1(void)
 {
 	return Port1;
 }
 
 
-SwitchPort & CSwitchApp::GetPort2(void)
+SwitchPort * CSwitchApp::GetPort2(void)
 {
 	return Port2;
 }
@@ -133,7 +133,6 @@ MACtable * CSwitchApp::GetMACtab(void)
 UINT CSwitchApp::ReceiveThread(void * pParam)
 {
 	SwitchPort *port = (SwitchPort *) pParam;
-	MACtable *table = theApp.GetMACtab();
 	Frame *buffer = port->GetBuffer();
 	pcap_t *handle;
 	char errbuf[PCAP_ERRBUF_SIZE];
@@ -141,6 +140,7 @@ UINT CSwitchApp::ReceiveThread(void * pParam)
 	int flag = PCAP_OPENFLAG_PROMISCUOUS | PCAP_OPENFLAG_NOCAPTURE_LOCAL | PCAP_OPENFLAG_MAX_RESPONSIVENESS;
 	pcap_pkthdr *header = NULL;
 	const u_char *frame = NULL;
+	SendThreadParam p;
 	int retval;
 	
 	handle = pcap_open(port->GetName(),65536,flag,1000,NULL,errbuf);
@@ -150,10 +150,16 @@ UINT CSwitchApp::ReceiveThread(void * pParam)
 		theApp.GetSwitchDlg()->MessageBox(CString(errorstring),_T("Error"),MB_ICONERROR);
 		return 0;
 	}
-	while((retval = pcap_next_ex(handle,&header,&frame)) >= 0)
+	
+	p.handle = handle;
+	if (port->GetIndex() == 1) p.port = theApp.GetPort2();
+	else p.port = theApp.GetPort1();
+	AfxBeginThread(CSwitchApp::SendThread,&p);
+
+	while ((retval = pcap_next_ex(handle,&header,&frame)) >= 0)
 	{
 		if (retval == 0) continue;
-		buffer->AddFrame(frame);
+		buffer->AddFrame(header->len,frame);
 	}
 	if (retval == -1)
 	{
@@ -165,8 +171,47 @@ UINT CSwitchApp::ReceiveThread(void * pParam)
 }
 
 
+UINT CSwitchApp::SendThread(void * pParam)
+{
+	SendThreadParam *p = (SendThreadParam *) pParam;
+	SwitchPort *port = p->port;
+	MACtable *table = theApp.GetMACtab();
+	Frame *buffer = port->GetBuffer();
+	pcap_t *handle = p->handle;
+	CStringA errorstring;
+	int retval = 0;
+	MACaddr src, dest, local = port->GetMACAddrStruct();
+	
+	while (TRUE)
+	{
+		buffer->GetFrame();
+		src = buffer->GetSrcMAC();
+		// if source MAC address is the local MAC address, the frame is ignored
+		if (table->CompareMAC(src,local) == 0) continue;
+		dest = buffer->GetDestMAC();
+		// if source and destination MAC addresses are the same, the frame is ignored
+		if (table->CompareMAC(src,dest) == 0) continue;
+		// if source MAC address is broadcast address, the frame is ignored
+		if (table->IsBroadcast(src)) continue;
+		// search in MAC table
+		retval = table->Find(port->GetIndex(),src,dest);
+		// if destination MAC address is the local MAC address, the frame is ignored
+		if ((retval == -1) && (table->CompareMAC(dest,local) == 0)) continue;
+		// if destination MAC address is on same port, the frame is not sent out
+		if (retval == port->GetIndex()) continue;
+
+		retval = pcap_sendpacket(handle,buffer->GetData(),buffer->GetLength());
+		if (retval != 0) break;
+	}
+	errorstring.Format("Error sending the packets on PORT %d!\n%s",port->GetIndex(),pcap_geterr(handle));
+	theApp.GetSwitchDlg()->MessageBox(CString(errorstring),_T("Error"),MB_ICONERROR);
+
+	return 0;
+}
+
+
 void CSwitchApp::StartThreads(void)
 {
-	AfxBeginThread(CSwitchApp::ReceiveThread,&Port1);
-	AfxBeginThread(CSwitchApp::ReceiveThread,&Port2);
+	AfxBeginThread(CSwitchApp::ReceiveThread,Port1);
+	AfxBeginThread(CSwitchApp::ReceiveThread,Port2);
 }

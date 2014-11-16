@@ -4,6 +4,7 @@
 
 Frame::Frame(void)
 	: frame(NULL)
+	, length(0)
 {
 }
 
@@ -13,18 +14,27 @@ Frame::~Frame(void)
 }
 
 
-void Frame::AddFrame(const u_char *data_const)
+void Frame::AddFrame(u_int length, const u_char *data_const)
 {
-	u_char *data = const_cast<u_char *>(data_const);
+	BufferedFrame *FrameToAdd = (BufferedFrame *) malloc(sizeof(BufferedFrame));
+
+	FrameToAdd->FrameLength = length;
+	FrameToAdd->FrameData = (u_char *) malloc(length);
+	memcpy(FrameToAdd->FrameData,data_const,length);
 	
-	send(buffer,data);
+	send(buffer,FrameToAdd);
 }
 
 
 void Frame::GetFrame(void)
 {
+	BufferedFrame *FrameToExtract = receive(buffer);
+
 	if (frame) free(frame);
-	frame = receive(buffer);
+	length = FrameToExtract->FrameLength;
+	frame = FrameToExtract->FrameData;
+
+	free(FrameToExtract);
 }
 
 
@@ -51,4 +61,10 @@ MACaddr Frame::GetDestMAC(void)
 u_char * Frame::GetData(void)
 {
 	return frame;
+}
+
+
+u_int Frame::GetLength(void)
+{
+	return length;
 }

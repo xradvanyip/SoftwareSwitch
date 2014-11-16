@@ -20,7 +20,7 @@ private:
 	MACaddr MACAddrStruct;
 	PORT_MODE Mode;
 	static PIP_ADAPTER_ADDRESSES AdaptersInfoBuffer;
-	Frame *bufferedFrame;
+	Frame *FrameBuffer;
 public:
 	CStringA GetName(void);
 	CString GetDescription(void);

@@ -122,11 +122,11 @@ void CSwitchDlg::OnOK(void)
 
 void CSwitchDlg::InitPortsInfo(void)
 {
-	m_port1macaddr.SetWindowTextW(theApp.GetPort1().GetMACAddress());
-	m_port2macaddr.SetWindowTextW(theApp.GetPort2().GetMACAddress());
+	m_port1macaddr.SetWindowTextW(theApp.GetPort1()->GetMACAddress());
+	m_port2macaddr.SetWindowTextW(theApp.GetPort2()->GetMACAddress());
 	
-	m_port1desc.SetWindowTextW(theApp.GetPort1().GetDescription());
-	m_port2desc.SetWindowTextW(theApp.GetPort2().GetDescription());
+	m_port1desc.SetWindowTextW(theApp.GetPort1()->GetDescription());
+	m_port2desc.SetWindowTextW(theApp.GetPort2()->GetDescription());
 		
 	m_port1mode.SetCurSel(0);
 	m_port2mode.SetCurSel(0);
@@ -159,13 +159,13 @@ void CSwitchDlg::OnPort1ModeChange()
 {
 	if (m_port1mode.GetCurSel() == 0)
 	{
-		theApp.GetPort1().SetMode(ACCESS);
+		theApp.GetPort1()->SetMode(ACCESS);
 		m_port1accessvlan.EnableWindow(TRUE);
 		m_port1vlansbutton.EnableWindow(FALSE);
 	}
 	else
 	{
-		theApp.GetPort1().SetMode(TRUNK);
+		theApp.GetPort1()->SetMode(TRUNK);
 		m_port1accessvlan.EnableWindow(FALSE);
 		m_port1vlansbutton.EnableWindow(TRUE);
 	}
@@ -176,13 +176,13 @@ void CSwitchDlg::OnPort2ModeChange()
 {
 	if (m_port2mode.GetCurSel() == 0)
 	{
-		theApp.GetPort2().SetMode(ACCESS);
+		theApp.GetPort2()->SetMode(ACCESS);
 		m_port2accessvlan.EnableWindow(TRUE);
 		m_port2vlansbutton.EnableWindow(FALSE);
 	}
 	else
 	{
-		theApp.GetPort2().SetMode(TRUNK);
+		theApp.GetPort2()->SetMode(TRUNK);
 		m_port2accessvlan.EnableWindow(FALSE);
 		m_port2vlansbutton.EnableWindow(TRUE);
 	}
@@ -213,8 +213,8 @@ void CSwitchDlg::OnBnClickedPort1VLANs()
 void CSwitchDlg::OnBnClickedPort2VLANs()
 {
 	// TODO: Add your control notification handler code here
-	theApp.GetMACtab()->Add(1,theApp.GetPort1().GetMACAddrStruct());
-	theApp.GetMACtab()->Add(2,theApp.GetPort2().GetMACAddrStruct());
+	theApp.GetMACtab()->Add(1,theApp.GetPort1()->GetMACAddrStruct());
+	theApp.GetMACtab()->Add(2,theApp.GetPort2()->GetMACAddrStruct());
 }
 
 

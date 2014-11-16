@@ -93,3 +93,13 @@ void MACtable::SetTimeOut(UINT seconds)
 {
 	TimeOut = seconds;
 }
+
+
+int MACtable::IsBroadcast(MACaddr& address)
+{
+	int i;
+
+	for (i=0;i < 6;i++) if (address.b[i] != 0xFF) return 0;
+	
+	return 1;
+}

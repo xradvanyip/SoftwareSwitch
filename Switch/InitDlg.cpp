@@ -49,11 +49,11 @@ void CInitDlg::OnBnClickedOk()
 		return;
 	}
 	pcap_createsrcstr(newname,PCAP_SRC_IFLOCAL,NULL,NULL,IfNames[m_port1box.GetCurSel()],errbuf);
-	theApp.GetPort1().SetName(newname);
-	theApp.GetPort1().SetDescription(IfDescs[m_port1box.GetCurSel()]);
+	theApp.GetPort1()->SetName(newname);
+	theApp.GetPort1()->SetDescription(IfDescs[m_port1box.GetCurSel()]);
 	pcap_createsrcstr(newname,PCAP_SRC_IFLOCAL,NULL,NULL,IfNames[m_port2box.GetCurSel()],errbuf);
-	theApp.GetPort2().SetName(newname);
-	theApp.GetPort2().SetDescription(IfDescs[m_port2box.GetCurSel()]);
+	theApp.GetPort2()->SetName(newname);
+	theApp.GetPort2()->SetDescription(IfDescs[m_port2box.GetCurSel()]);
 	IfNames.RemoveAll();
 	IfDescs.RemoveAll();
 	pcap_freealldevs(interfaces);
