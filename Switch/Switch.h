@@ -43,6 +43,7 @@ private:
 	SwitchPort *Port2;
 	MACtable *MACTab;
 public:
+	static CRITICAL_SECTION m_cs;
 	SwitchPort * GetPort1(void);
 	SwitchPort * GetPort2(void);
 	CSwitchDlg * GetSwitchDlg(void);

@@ -260,7 +260,9 @@ void CSwitchDlg::OnDeltaposTimeoutspin(NMHDR *pNMHDR, LRESULT *pResult)
 	CString tmp;
 	UINT seconds = (UINT)pNMUpDown->iPos * 5;
 	
+	EnterCriticalSection(&CSwitchApp::m_cs);
 	theApp.GetMACtab()->SetTimeOut(seconds);
+	LeaveCriticalSection(&CSwitchApp::m_cs);
 	tmp.Format(_T("%.2d:%.2d"),seconds / 60, seconds % 60);
 	m_timeout.SetWindowTextW(tmp);
 	*pResult = 0;
@@ -269,7 +271,11 @@ void CSwitchDlg::OnDeltaposTimeoutspin(NMHDR *pNMHDR, LRESULT *pResult)
 
 void CSwitchDlg::OnTimer(UINT_PTR nIDEvent)
 {
+	EnterCriticalSection(&CSwitchApp::m_cs);
+
 	theApp.GetMACtab()->Maintain();
+
+	LeaveCriticalSection(&CSwitchApp::m_cs);
 
 	CDialog::OnTimer(nIDEvent);
 }

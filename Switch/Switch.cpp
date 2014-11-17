@@ -34,6 +34,8 @@ CSwitchApp::CSwitchApp()
 
 CSwitchApp theApp;
 
+CRITICAL_SECTION CSwitchApp::m_cs;
+
 
 // CSwitchApp initialization
 
@@ -70,6 +72,7 @@ BOOL CSwitchApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
+	InitializeCriticalSection(&m_cs);
 	MACTab = new MACtable();
 	Port1 = new SwitchPort(1);
 	Port2 = new SwitchPort(2);
@@ -193,8 +196,12 @@ UINT CSwitchApp::SendThread(void * pParam)
 		if (table->CompareMAC(src,dest) == 0) continue;
 		// if source MAC address is broadcast address, the frame is ignored
 		if (table->IsBroadcast(src)) continue;
+
+		EnterCriticalSection(&CSwitchApp::m_cs);
 		// search in MAC table
 		retval = table->Find(port->GetIndex(),src,dest);
+		LeaveCriticalSection(&CSwitchApp::m_cs);
+
 		// if destination MAC address is the local MAC address, the frame is ignored
 		if ((retval == -1) && (table->CompareMAC(dest,local) == 0)) continue;
 		// if destination MAC address is on same port, the frame is not sent out
