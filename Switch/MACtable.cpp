@@ -39,8 +39,10 @@ int MACtable::Find(int port_in, MACaddr src, MACaddr dest)
 				TableEntry[i].port = port_in;
 				theApp.GetSwitchDlg()->ModifyMACTab(i,TableEntry[i]);
 			}
-			TableEntry[i].SecondsLeft = TimeOut;
-			theApp.GetSwitchDlg()->UpdateTimeout(i,TimeOut);
+			if (TableEntry[i].SecondsLeft != TimeOut) {
+				TableEntry[i].SecondsLeft = TimeOut;
+				theApp.GetSwitchDlg()->UpdateTimeout(i,TimeOut);
+			}
 			src_found = 1;
 		}
 		if ((!dest_found) && (CompareMAC(dest,TableEntry[i].address) == 0))
