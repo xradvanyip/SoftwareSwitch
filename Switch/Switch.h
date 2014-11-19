@@ -14,6 +14,7 @@
 #include "MACtable.h"
 #include <pcap.h>
 #include "Frame.h"
+#include "Stats.h"
 
 
 struct SendThreadParam {
@@ -42,8 +43,14 @@ private:
 	SwitchPort *Port1;
 	SwitchPort *Port2;
 	MACtable *MACTab;
+	Stats *SwitchStats;
+	FILE *f_eth2;
+	FILE *f_ip;
+	FILE *f_ports;
 public:
-	static CRITICAL_SECTION m_cs;
+	static CRITICAL_SECTION m_cs_mactable;
+	static CRITICAL_SECTION m_cs_stats;
+	BOOL stats_enabled;
 	SwitchPort * GetPort1(void);
 	SwitchPort * GetPort2(void);
 	CSwitchDlg * GetSwitchDlg(void);
@@ -51,6 +58,11 @@ public:
 	static UINT ReceiveThread(void * pParam);
 	static UINT SendThread(void * pParam);
 	void StartThreads(void);
+	CString CheckTextFiles(void);
+	CString GetEth2ProtocolName(WORD type);
+	CString GetIPProtocolName(BYTE type);
+	WORD GetPortNumber(char * AppName);
+	Stats * GetStatistics(void);
 };
 
 extern CSwitchApp theApp;

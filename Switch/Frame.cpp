@@ -68,3 +68,80 @@ u_int Frame::GetLength(void)
 {
 	return length;
 }
+
+
+WORD Frame::MergeBytes(BYTE upper, BYTE lower)
+{
+	WORD num = upper << 8;
+	num |= lower;
+	return num;
+}
+
+
+BYTE Frame::GetUpperByte(WORD number)
+{
+	return number >> 8;
+}
+
+
+BYTE Frame::GetLowerByte(WORD number)
+{
+	return number & 0xFF;
+}
+
+
+FRAME_TYPE Frame::GetType(void)
+{
+	if (frame[12] >= 0x06) return ETH2;
+	else if ((frame[14] == 0xFF) && (frame[15] == 0xFF)) return RAW;
+	else if ((frame[14] == 0xAA) && (frame[15] == 0xAA) && (frame[16] == 0x03)) return SNAP;
+	else return LLC;
+}
+
+
+WORD Frame::GetLay3Type(void)
+{
+	return MergeBytes(frame[12],frame[13]);
+}
+
+
+BYTE Frame::GetLay4Type(void)
+{
+	return frame[23];
+}
+
+
+WORD Frame::GetLay4SrcPort(void)
+{
+	int IP_header_length = (frame[14] & 0x0F) * 4;
+
+	return MergeBytes(frame[ETH2_HDR_LEN+IP_header_length],frame[ETH2_HDR_LEN+IP_header_length+1]);
+}
+
+
+WORD Frame::GetLay4DestPort(void)
+{
+	int IP_header_length = (frame[14] & 0x0F) * 4;
+	
+	return MergeBytes(frame[ETH2_HDR_LEN+IP_header_length+2],frame[ETH2_HDR_LEN+IP_header_length+3]);
+}
+
+
+IPaddr Frame::GetSrcIPaddr(void)
+{
+	IPaddr src;
+	int i;
+	
+	for (i=26;i < 30;i++) src.b[i-26] = frame[i];
+	return src;
+}
+
+
+IPaddr Frame::GetDestIPaddr(void)
+{
+	IPaddr dest;
+	int i;
+	
+	for (i=30;i < 34;i++) dest.b[i-30] = frame[i];
+	return dest;
+}

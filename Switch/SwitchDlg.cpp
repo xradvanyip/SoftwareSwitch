@@ -38,6 +38,9 @@ void CSwitchDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_LIST1, m_mactable);
 	DDX_Control(pDX, IDC_TIMEOUT, m_timeout);
 	DDX_Control(pDX, IDC_TIMEOUTSPIN, m_timeoutspin);
+	DDX_Control(pDX, IDC_STATSLIST, m_stats);
+	DDX_Control(pDX, IDC_STATSCHECK, m_statscheckbox);
+	DDX_Control(pDX, IDC_STATSRESETBUTTON, m_statsresetbutton);
 }
 
 BEGIN_MESSAGE_MAP(CSwitchDlg, CDialog)
@@ -55,6 +58,10 @@ BEGIN_MESSAGE_MAP(CSwitchDlg, CDialog)
 	ON_MESSAGE(WM_DELETEFROMMAC_MESSAGE, &CSwitchDlg::OnDeleteFromMacMessage)
 	ON_MESSAGE(WM_MODIFYMAC_MESSAGE, &CSwitchDlg::OnModifyMacMessage)
 	ON_MESSAGE(WM_UPDATETIMEOUT_MESSAGE, &CSwitchDlg::OnUpdateTimeoutMessage)
+	ON_MESSAGE(WM_INSERTSTAT_MESSAGE, &CSwitchDlg::OnInsertStatMessage)
+	ON_MESSAGE(WM_UPDATESTAT_MESSAGE, &CSwitchDlg::OnUpdateStatMessage)
+	ON_BN_CLICKED(IDC_STATSCHECK, &CSwitchDlg::OnBnClickedStatscheck)
+	ON_BN_CLICKED(IDC_STATSRESETBUTTON, &CSwitchDlg::OnBnClickedStatsresetbutton)
 END_MESSAGE_MAP()
 
 
@@ -72,6 +79,7 @@ BOOL CSwitchDlg::OnInitDialog()
 	// TODO: Add extra initialization here
 	InitPortsInfo();
 	InitMACtable();
+	InitStatsTable();
 	SetTimer(1,5000,NULL);
 	theApp.StartThreads();
 
@@ -155,6 +163,21 @@ void CSwitchDlg::InitMACtable(void)
 }
 
 
+void CSwitchDlg::InitStatsTable(void)
+{
+	m_stats.SetExtendedStyle(m_stats.GetExtendedStyle() | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
+	m_stats.InsertColumn(0,_T("Port"),LVCFMT_CENTER,32);
+	m_stats.InsertColumn(1,_T("In/Out"),LVCFMT_CENTER,44);
+	m_stats.InsertColumn(2,_T("Frame type"),LVCFMT_CENTER,67);
+	m_stats.InsertColumn(3,_T("Protocol in Eth II"),LVCFMT_CENTER,92);
+	m_stats.InsertColumn(4,_T("Protocol in IP"),LVCFMT_CENTER,86);
+	m_stats.InsertColumn(5,_T("Count"),LVCFMT_CENTER,55);
+
+	m_statscheckbox.SetCheck(BST_CHECKED);
+	theApp.stats_enabled = 1;
+}
+
+
 void CSwitchDlg::OnPort1ModeChange()
 {
 	if (m_port1mode.GetCurSel() == 0)
@@ -205,7 +228,7 @@ void CSwitchDlg::OnBnClickedPort1VLANs()
 {
 	// TODO: Add your control notification handler code here
 	CString str;
-	str.Format(_T("%d %d %d count:%d"),m_mactable.GetColumnWidth(0),m_mactable.GetColumnWidth(1),m_mactable.GetColumnWidth(2),m_mactable.GetItemCount());
+	str.Format(_T("%d %d %d %d %d %d"),m_stats.GetColumnWidth(0),m_stats.GetColumnWidth(1),m_stats.GetColumnWidth(2),m_stats.GetColumnWidth(3),m_stats.GetColumnWidth(4),m_stats.GetColumnWidth(5));
 	AfxMessageBox(str);
 }
 
@@ -260,9 +283,9 @@ void CSwitchDlg::OnDeltaposTimeoutspin(NMHDR *pNMHDR, LRESULT *pResult)
 	CString tmp;
 	UINT seconds = (UINT)pNMUpDown->iPos * 5;
 	
-	EnterCriticalSection(&CSwitchApp::m_cs);
+	EnterCriticalSection(&CSwitchApp::m_cs_mactable);
 	theApp.GetMACtab()->SetTimeOut(seconds);
-	LeaveCriticalSection(&CSwitchApp::m_cs);
+	LeaveCriticalSection(&CSwitchApp::m_cs_mactable);
 	tmp.Format(_T("%.2d:%.2d"),seconds / 60, seconds % 60);
 	m_timeout.SetWindowTextW(tmp);
 	*pResult = 0;
@@ -271,11 +294,11 @@ void CSwitchDlg::OnDeltaposTimeoutspin(NMHDR *pNMHDR, LRESULT *pResult)
 
 void CSwitchDlg::OnTimer(UINT_PTR nIDEvent)
 {
-	EnterCriticalSection(&CSwitchApp::m_cs);
+	EnterCriticalSection(&CSwitchApp::m_cs_mactable);
 
 	theApp.GetMACtab()->Maintain();
 
-	LeaveCriticalSection(&CSwitchApp::m_cs);
+	LeaveCriticalSection(&CSwitchApp::m_cs_mactable);
 
 	CDialog::OnTimer(nIDEvent);
 }
@@ -341,4 +364,107 @@ afx_msg LRESULT CSwitchDlg::OnUpdateTimeoutMessage(WPARAM wParam, LPARAM lParam)
 	free(timeout);
 	
 	return 0;
+}
+
+
+afx_msg LRESULT CSwitchDlg::OnInsertStatMessage(WPARAM wParam, LPARAM lParam)
+{
+	int *index = (int *)wParam;
+	Statistic *s = (Statistic *)lParam;
+	CString tmp;
+	
+	tmp.Format(_T("%d"),s->port);
+	m_stats.InsertItem(*index,tmp);
+
+	if (s->d == In) m_stats.SetItemText(*index,1,_T("in"));
+	else m_stats.SetItemText(*index,1,_T("out"));
+
+	if (s->HasFrameType == 2) switch (s->FrameType)
+	{
+	case ETH2:
+		m_stats.SetItemText(*index,2,_T("Eth II"));
+		break;
+
+	case RAW:
+		m_stats.SetItemText(*index,2,_T("RAW"));
+		break;
+
+	case SNAP:
+		m_stats.SetItemText(*index,2,_T("SNAP"));
+		break;
+
+	case LLC:
+		m_stats.SetItemText(*index,2,_T("LLC"));
+		break;
+	}
+	else m_stats.SetItemText(*index,2,_T("any"));
+
+	if (s->HasLay3Type == 2) m_stats.SetItemText(*index,3,theApp.GetEth2ProtocolName(s->Lay3Type));
+	else if (s->HasLay3Type == 1) m_stats.SetItemText(*index,3,_T("any"));
+	else m_stats.SetItemText(*index,3,_T("-"));
+
+	if (s->HasLay4Type == 2) m_stats.SetItemText(*index,4,theApp.GetIPProtocolName(s->Lay4Type));
+	else if (s->HasLay4Type == 1) m_stats.SetItemText(*index,4,_T("any"));
+	else m_stats.SetItemText(*index,4,_T("-"));
+
+	tmp.Format(_T("%u"),s->count);
+	m_stats.SetItemText(*index,5,tmp);
+
+	free(index);
+	free(s);
+	
+	return 0;
+}
+
+
+afx_msg LRESULT CSwitchDlg::OnUpdateStatMessage(WPARAM wParam, LPARAM lParam)
+{
+	int *index = (int *)wParam;
+	UINT *count = (UINT *)lParam;
+	CString tmp;
+
+	tmp.Format(_T("%u"),*count);
+	m_stats.SetItemText(*index,5,tmp);
+	free(index);
+	free(count);
+	
+	return 0;
+}
+
+
+void CSwitchDlg::InsertStat(int index, Statistic s)
+{
+	int *indexptr = (int *) malloc(sizeof(int));
+	Statistic *sptr = (Statistic *) malloc(sizeof(Statistic));
+	*indexptr = index;
+	*sptr = s;
+	SendMessage(WM_INSERTSTAT_MESSAGE,(WPARAM)indexptr,(LPARAM)sptr);
+}
+
+
+void CSwitchDlg::UpdateStat(int index, UINT count)
+{
+	int *indexptr = (int *) malloc(sizeof(int));
+	UINT *countptr = (UINT *) malloc(sizeof(UINT));
+	*indexptr = index;
+	*countptr = count;
+	SendMessage(WM_UPDATESTAT_MESSAGE,(WPARAM)indexptr,(LPARAM)countptr);
+}
+
+
+void CSwitchDlg::OnBnClickedStatscheck()
+{
+	EnterCriticalSection(&CSwitchApp::m_cs_stats);
+	if (m_statscheckbox.GetCheck()) theApp.stats_enabled = 1;
+	else theApp.stats_enabled = 0;
+	LeaveCriticalSection(&CSwitchApp::m_cs_stats);
+}
+
+
+void CSwitchDlg::OnBnClickedStatsresetbutton()
+{
+	EnterCriticalSection(&CSwitchApp::m_cs_stats);
+	theApp.GetStatistics()->Reset();
+	m_stats.DeleteAllItems();
+	LeaveCriticalSection(&CSwitchApp::m_cs_stats);
 }

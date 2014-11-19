@@ -66,6 +66,13 @@ BOOL CInitDlg::OnInitDialog()
 {
 	CDialog::OnInitDialog();
 	
+	CString error = theApp.CheckTextFiles();
+		
+	if (error.IsEmpty() == FALSE) {
+		AfxMessageBox(error,MB_ICONERROR);
+		OnCancel();
+	}
+	
 	if (pcap_findalldevs(&interfaces,errbuf) == -1)
 	{
 		MessageBox(CString("Error during searching for interfaces: ") + CString(errbuf),_T("Error"),MB_ICONERROR);

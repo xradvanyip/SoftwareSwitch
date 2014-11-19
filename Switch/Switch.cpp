@@ -21,6 +21,10 @@ END_MESSAGE_MAP()
 // CSwitchApp construction
 
 CSwitchApp::CSwitchApp()
+	: f_eth2(NULL)
+	, f_ip(NULL)
+	, f_ports(NULL)
+	, SwitchStats(NULL)
 {
 	// support Restart Manager
 	m_dwRestartManagerSupportFlags = AFX_RESTART_MANAGER_SUPPORT_RESTART;
@@ -34,7 +38,8 @@ CSwitchApp::CSwitchApp()
 
 CSwitchApp theApp;
 
-CRITICAL_SECTION CSwitchApp::m_cs;
+CRITICAL_SECTION CSwitchApp::m_cs_mactable;
+CRITICAL_SECTION CSwitchApp::m_cs_stats;
 
 
 // CSwitchApp initialization
@@ -72,10 +77,16 @@ BOOL CSwitchApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	InitializeCriticalSection(&m_cs);
+	InitializeCriticalSection(&m_cs_mactable);
+	InitializeCriticalSection(&m_cs_stats);
 	MACTab = new MACtable();
 	Port1 = new SwitchPort(1);
 	Port2 = new SwitchPort(2);
+	SwitchStats = new Stats();
+	
+	f_eth2 = fopen("ethernet2_protocols.txt","r");
+	f_ip = fopen("ip_protocols.txt","r");
+	f_ports = fopen("ports.txt","r");
 	
 	CInitDlg init_dlg;
 	INT_PTR nResponse = init_dlg.DoModal();
@@ -149,7 +160,7 @@ UINT CSwitchApp::ReceiveThread(void * pParam)
 	handle = pcap_open(port->GetName(),65536,flag,1000,NULL,errbuf);
 	if (!handle)
 	{
-		errorstring.Format("Unable to open the adapter on PORT %d!\n%s",port->GetIndex(),errbuf);
+		errorstring.Format("Unable to open the adapter on PORT %d!\r\n%s",port->GetIndex(),errbuf);
 		theApp.GetSwitchDlg()->MessageBox(CString(errorstring),_T("Error"),MB_ICONERROR);
 		return 0;
 	}
@@ -166,7 +177,7 @@ UINT CSwitchApp::ReceiveThread(void * pParam)
 	}
 	if (retval == -1)
 	{
-		errorstring.Format("Error receiving the packets on PORT %d!\n%s",port->GetIndex(),pcap_geterr(handle));
+		errorstring.Format("Error receiving the packets on PORT %d!\r\n%s",port->GetIndex(),pcap_geterr(handle));
 		theApp.GetSwitchDlg()->MessageBox(CString(errorstring),_T("Error"),MB_ICONERROR);
 	}
 
@@ -180,6 +191,7 @@ UINT CSwitchApp::SendThread(void * pParam)
 	SwitchPort *port = p->port;
 	MACtable *table = theApp.GetMACtab();
 	Frame *buffer = port->GetBuffer();
+	Stats *stats = theApp.GetStatistics();
 	pcap_t *handle = p->handle;
 	CStringA errorstring;
 	int retval = 0;
@@ -188,6 +200,11 @@ UINT CSwitchApp::SendThread(void * pParam)
 	while (TRUE)
 	{
 		buffer->GetFrame();
+
+		EnterCriticalSection(&CSwitchApp::m_cs_stats);
+		if (theApp.stats_enabled) stats->Add(port->GetIndex(),In,buffer);
+		LeaveCriticalSection(&CSwitchApp::m_cs_stats);
+
 		src = buffer->GetSrcMAC();
 		// if source MAC address is the local MAC address, the frame is ignored
 		if (table->CompareMAC(src,local) == 0) continue;
@@ -197,10 +214,10 @@ UINT CSwitchApp::SendThread(void * pParam)
 		// if source MAC address is broadcast address, the frame is ignored
 		if (table->IsBroadcast(src)) continue;
 
-		EnterCriticalSection(&CSwitchApp::m_cs);
+		EnterCriticalSection(&CSwitchApp::m_cs_mactable);
 		// search in MAC table
 		retval = table->Find(port->GetIndex(),src,dest);
-		LeaveCriticalSection(&CSwitchApp::m_cs);
+		LeaveCriticalSection(&CSwitchApp::m_cs_mactable);
 
 		// if destination MAC address is the local MAC address, the frame is ignored
 		if ((retval == -1) && (table->CompareMAC(dest,local) == 0)) continue;
@@ -210,7 +227,7 @@ UINT CSwitchApp::SendThread(void * pParam)
 		retval = pcap_sendpacket(handle,buffer->GetData(),buffer->GetLength());
 		if (retval != 0) break;
 	}
-	errorstring.Format("Error sending the packets on PORT %d!\n%s",port->GetIndex(),pcap_geterr(handle));
+	errorstring.Format("Error sending the packets on PORT %d!\r\n%s",port->GetIndex(),pcap_geterr(handle));
 	theApp.GetSwitchDlg()->MessageBox(CString(errorstring),_T("Error"),MB_ICONERROR);
 
 	return 0;
@@ -221,4 +238,68 @@ void CSwitchApp::StartThreads(void)
 {
 	AfxBeginThread(CSwitchApp::ReceiveThread,Port1);
 	AfxBeginThread(CSwitchApp::ReceiveThread,Port2);
+}
+
+
+CString CSwitchApp::CheckTextFiles(void)
+{
+	CString error(_T("Can't open:"));
+
+	if ((f_eth2) && (f_ip) && (f_ports)) return _T("");
+	if (!f_eth2) error.AppendFormat(_T("\r\nethernet2_protocols.txt"));
+	if (!f_ip) error.AppendFormat(_T("\r\nip_protocols.txt"));
+	if (!f_ports) error.AppendFormat(_T("\r\nports.txt"));
+
+	return error;
+}
+
+
+CString CSwitchApp::GetEth2ProtocolName(WORD type)
+{
+	CStringA name;
+	char tmp[100], scanstr[50];
+	char namestr[50], numstr[10];
+
+	sprintf(scanstr,"%%[^\t]s%.4X",type);
+	sprintf(numstr,"%.4X",type);
+	while (fgets(tmp,100,f_eth2) != NULL) if ((strstr(tmp,numstr) != NULL) && (sscanf(tmp,scanstr,namestr) > 0)) break;
+	rewind(f_eth2);
+	name.Format("%s",namestr);
+	
+	return CString(name);
+}
+
+
+CString CSwitchApp::GetIPProtocolName(BYTE type)
+{
+	CStringA name;
+	char tmp[100], scanstr[50];
+	char namestr[50], numstr[10];
+
+	sprintf(scanstr,"%%[^\t]s%u",type);
+	sprintf(numstr,"%u",type);
+	while (fgets(tmp,100,f_ip) != NULL) if ((strstr(tmp,numstr) != NULL) && (sscanf(tmp,scanstr,namestr) > 0)) break;
+	rewind(f_ip);
+	name.Format("%s",namestr);
+	
+	return CString(name);
+}
+
+
+WORD CSwitchApp::GetPortNumber(char * AppName)
+{
+	WORD num;
+	char tmp[100], scanstr[50];
+	
+	sprintf(scanstr,"%s\t%%*3c\t%%hu",AppName);
+	while (fgets(tmp,100,f_ports) != NULL) if ((strstr(tmp,AppName) != NULL) && (sscanf(tmp,scanstr,&num) > 0)) break;
+	rewind(f_ports);
+	
+	return num;
+}
+
+
+Stats * CSwitchApp::GetStatistics(void)
+{
+	return SwitchStats;
 }

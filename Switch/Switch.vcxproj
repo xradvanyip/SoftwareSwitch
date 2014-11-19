@@ -110,6 +110,7 @@
     <ClInclude Include="InitDlg.h" />
     <ClInclude Include="MACtable.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="Stats.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="Switch.h" />
     <ClInclude Include="SwitchDlg.h" />
@@ -121,6 +122,7 @@
     <ClCompile Include="Frame.cpp" />
     <ClCompile Include="InitDlg.cpp" />
     <ClCompile Include="MACtable.cpp" />
+    <ClCompile Include="Stats.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
