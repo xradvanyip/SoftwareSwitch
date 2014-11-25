@@ -463,10 +463,3 @@ void CRuleDlg::OnBnClickedOk()
 
 	CDialog::OnOK();
 }
-
-
-int CRuleDlg::IsNumber(CString str)
-{
-	//if (str.SpanIncluding(_T("0123456789")) == str)
-	return 0;
-}

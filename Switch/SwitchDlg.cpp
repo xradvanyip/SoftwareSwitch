@@ -460,7 +460,7 @@ afx_msg LRESULT CSwitchDlg::OnUpdateStatMessage(WPARAM wParam, LPARAM lParam)
 }
 
 
-void CSwitchDlg::InsertStat(int index, Statistic s)
+void CSwitchDlg::InsertStat(int index, Statistic& s)
 {
 	int *indexptr = (int *) malloc(sizeof(int));
 	Statistic *sptr = (Statistic *) malloc(sizeof(Statistic));
@@ -542,6 +542,7 @@ void CSwitchDlg::OnBnClickedRuleRemoveButton()
 		AllowCheckBoxes = 0;
 		theApp.GetFilter()->Remove(index);
 		m_rules.DeleteItem(index);
+		AutoResizeColumns(&m_rules);
 		AllowCheckBoxes = 1;
 		LeaveCriticalSection(&CSwitchApp::m_cs_filter);
 	}
@@ -554,6 +555,7 @@ void CSwitchDlg::OnBnClickedRuleRemoveAllButton()
 	AllowCheckBoxes = 0;
 	theApp.GetFilter()->RemoveAll();
 	m_rules.DeleteAllItems();
+	AutoResizeColumns(&m_rules);
 	LeaveCriticalSection(&CSwitchApp::m_cs_filter);
 }
 

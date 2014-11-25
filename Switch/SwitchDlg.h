@@ -90,7 +90,7 @@ public:
 	void UpdateTimeout(int index, UINT timeout);
 	afx_msg void OnDeltaposTimeoutspin(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
-	void InsertStat(int index, Statistic s);
+	void InsertStat(int index, Statistic& s);
 	void UpdateStat(int index, UINT count);
 	static UINT RuleEditThread(void * pParam);
 	void EditRule(int *index, Rule& r);

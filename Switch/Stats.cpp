@@ -25,7 +25,10 @@ void Stats::Add(int port, DIRECTION FDirection, Frame * f)
 	{
 		if ((!direction_found) && (table[i].HasFrameType < 2)) {
 			direction_index = i;
-			if ((table[i].port == port) && (table[i].d == FDirection)) direction_found = 1;
+			if ((table[i].port == port) && (table[i].d == FDirection)) {
+				direction_found = 1;
+				continue;
+			}
 		}
 		if ((!frametype_found) && (table[i].HasLay3Type < 2)) {
 			frametype_index = i;
@@ -33,6 +36,7 @@ void Stats::Add(int port, DIRECTION FDirection, Frame * f)
 				&& (table[i].FrameType == f->GetType())) {
 					frametype_found = 1;
 					if (table[i].FrameType != ETH2) break;
+					else continue;
 			}
 		}
 		if ((!lay3_found) && (table[i].HasLay4Type < 2)) {
@@ -41,6 +45,7 @@ void Stats::Add(int port, DIRECTION FDirection, Frame * f)
 				&& (table[i].FrameType == f->GetType()) && (table[i].Lay3Type == f->GetLay3Type())) {
 					lay3_found = 1;
 					if (table[i].Lay3Type != 0x0800) break;
+					else continue;
 			}
 		}
 		if (!lay4_found) {

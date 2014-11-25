@@ -47,6 +47,4 @@ public:
 	afx_msg void OnBnClickedSrcipcheck();
 	afx_msg void OnBnClickedDestipcheck();
 	afx_msg void OnBnClickedOk();
-private:
-	int IsNumber(CString str);
 };
