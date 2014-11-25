@@ -105,11 +105,13 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Filter.h" />
     <ClInclude Include="FixListCtrl.h" />
     <ClInclude Include="Frame.h" />
     <ClInclude Include="InitDlg.h" />
     <ClInclude Include="MACtable.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="RuleDlg.h" />
     <ClInclude Include="Stats.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="Switch.h" />
@@ -118,10 +120,12 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Filter.cpp" />
     <ClCompile Include="FixListCtrl.cpp" />
     <ClCompile Include="Frame.cpp" />
     <ClCompile Include="InitDlg.cpp" />
     <ClCompile Include="MACtable.cpp" />
+    <ClCompile Include="RuleDlg.cpp" />
     <ClCompile Include="Stats.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

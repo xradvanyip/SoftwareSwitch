@@ -28,6 +28,7 @@ public:
 	int Find(int port, MACaddr src, MACaddr dest);
 	int CompareMAC(MACaddr& mac1, MACaddr& mac2);
 	void Maintain(void);
+	CArray<StoredMAC> & GetTable(void);
 	UINT GetTimeOut(void);
 	void SetTimeOut(UINT seconds);
 	int IsBroadcast(MACaddr& address);

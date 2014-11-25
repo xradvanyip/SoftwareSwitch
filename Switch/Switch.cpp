@@ -25,6 +25,7 @@ CSwitchApp::CSwitchApp()
 	, f_ip(NULL)
 	, f_ports(NULL)
 	, SwitchStats(NULL)
+	, SwitchFilter(NULL)
 {
 	// support Restart Manager
 	m_dwRestartManagerSupportFlags = AFX_RESTART_MANAGER_SUPPORT_RESTART;
@@ -40,6 +41,9 @@ CSwitchApp theApp;
 
 CRITICAL_SECTION CSwitchApp::m_cs_mactable;
 CRITICAL_SECTION CSwitchApp::m_cs_stats;
+CRITICAL_SECTION CSwitchApp::m_cs_filter;
+CRITICAL_SECTION CSwitchApp::m_cs_file_eth2;
+CRITICAL_SECTION CSwitchApp::m_cs_file_ip;
 
 
 // CSwitchApp initialization
@@ -79,14 +83,23 @@ BOOL CSwitchApp::InitInstance()
 
 	InitializeCriticalSection(&m_cs_mactable);
 	InitializeCriticalSection(&m_cs_stats);
+	InitializeCriticalSection(&m_cs_filter);
+	InitializeCriticalSection(&m_cs_file_eth2);
+	InitializeCriticalSection(&m_cs_file_ip);
 	MACTab = new MACtable();
 	Port1 = new SwitchPort(1);
 	Port2 = new SwitchPort(2);
 	SwitchStats = new Stats();
+	SwitchFilter = new Filter();
 	
 	f_eth2 = fopen("ethernet2_protocols.txt","r");
 	f_ip = fopen("ip_protocols.txt","r");
 	f_ports = fopen("ports.txt","r");
+
+	CreateEth2ProtocolList();
+	CreateIPProtocolList();
+	CreateTCPAppList();
+	CreateUDPAppList();
 	
 	CInitDlg init_dlg;
 	INT_PTR nResponse = init_dlg.DoModal();
@@ -166,8 +179,9 @@ UINT CSwitchApp::ReceiveThread(void * pParam)
 	}
 	
 	p.handle = handle;
-	if (port->GetIndex() == 1) p.port = theApp.GetPort2();
-	else p.port = theApp.GetPort1();
+	p.out_port = port;
+	if (port->GetIndex() == 1) p.in_port = theApp.GetPort2();
+	else p.in_port = theApp.GetPort1();
 	AfxBeginThread(CSwitchApp::SendThread,&p);
 
 	while ((retval = pcap_next_ex(handle,&header,&frame)) >= 0)
@@ -188,23 +202,21 @@ UINT CSwitchApp::ReceiveThread(void * pParam)
 UINT CSwitchApp::SendThread(void * pParam)
 {
 	SendThreadParam *p = (SendThreadParam *) pParam;
-	SwitchPort *port = p->port;
+	SwitchPort *in_port = p->in_port;
+	SwitchPort *out_port = p->out_port;
 	MACtable *table = theApp.GetMACtab();
-	Frame *buffer = port->GetBuffer();
+	Frame *buffer = in_port->GetBuffer();
 	Stats *stats = theApp.GetStatistics();
+	Filter *filter = theApp.GetFilter();
 	pcap_t *handle = p->handle;
 	CStringA errorstring;
 	int retval = 0;
-	MACaddr src, dest, local = port->GetMACAddrStruct();
+	MACaddr src, dest, local = in_port->GetMACAddrStruct();
 	
 	while (TRUE)
 	{
 		buffer->GetFrame();
-
-		EnterCriticalSection(&CSwitchApp::m_cs_stats);
-		if (theApp.stats_enabled) stats->Add(port->GetIndex(),In,buffer);
-		LeaveCriticalSection(&CSwitchApp::m_cs_stats);
-
+				
 		src = buffer->GetSrcMAC();
 		// if source MAC address is the local MAC address, the frame is ignored
 		if (table->CompareMAC(src,local) == 0) continue;
@@ -216,18 +228,38 @@ UINT CSwitchApp::SendThread(void * pParam)
 
 		EnterCriticalSection(&CSwitchApp::m_cs_mactable);
 		// search in MAC table
-		retval = table->Find(port->GetIndex(),src,dest);
+		retval = table->Find(in_port->GetIndex(),src,dest);
 		LeaveCriticalSection(&CSwitchApp::m_cs_mactable);
 
 		// if destination MAC address is the local MAC address, the frame is ignored
 		if ((retval == -1) && (table->CompareMAC(dest,local) == 0)) continue;
 		// if destination MAC address is on same port, the frame is not sent out
-		if (retval == port->GetIndex()) continue;
+		if (retval == in_port->GetIndex()) continue;
+		
+		EnterCriticalSection(&CSwitchApp::m_cs_filter);
+		retval = filter->Check(in_port->GetIndex(),In,buffer);
+		LeaveCriticalSection(&CSwitchApp::m_cs_filter);
+		if (!retval) continue;
+		
+		EnterCriticalSection(&CSwitchApp::m_cs_stats);
+		if (theApp.stats_enabled) stats->Add(in_port->GetIndex(),In,buffer);
+		LeaveCriticalSection(&CSwitchApp::m_cs_stats);
+
+		//...
+
+		EnterCriticalSection(&CSwitchApp::m_cs_filter);
+		retval = filter->Check(out_port->GetIndex(),Out,buffer);
+		LeaveCriticalSection(&CSwitchApp::m_cs_filter);
+		if (!retval) continue;
+
+		EnterCriticalSection(&CSwitchApp::m_cs_stats);
+		if (theApp.stats_enabled) stats->Add(out_port->GetIndex(),Out,buffer);
+		LeaveCriticalSection(&CSwitchApp::m_cs_stats);
 
 		retval = pcap_sendpacket(handle,buffer->GetData(),buffer->GetLength());
 		if (retval != 0) break;
 	}
-	errorstring.Format("Error sending the packets on PORT %d!\r\n%s",port->GetIndex(),pcap_geterr(handle));
+	errorstring.Format("Error sending the packets on PORT %d!\r\n%s",out_port->GetIndex(),pcap_geterr(handle));
 	theApp.GetSwitchDlg()->MessageBox(CString(errorstring),_T("Error"),MB_ICONERROR);
 
 	return 0;
@@ -256,39 +288,135 @@ CString CSwitchApp::CheckTextFiles(void)
 
 CString CSwitchApp::GetEth2ProtocolName(WORD type)
 {
-	CStringA name;
 	char tmp[100], scanstr[50];
 	char namestr[50], numstr[10];
+	int found = 0;
+	CStringA name;
 
 	sprintf(scanstr,"%%[^\t]s%.4X",type);
 	sprintf(numstr,"%.4X",type);
-	while (fgets(tmp,100,f_eth2) != NULL) if ((strstr(tmp,numstr) != NULL) && (sscanf(tmp,scanstr,namestr) > 0)) break;
+	EnterCriticalSection(&CSwitchApp::m_cs_file_eth2);
+	while (fgets(tmp,100,f_eth2) != NULL) if ((strstr(tmp,numstr) != NULL) && (sscanf(tmp,scanstr,namestr) > 0)) {
+		found = 1;
+		break;
+	}
 	rewind(f_eth2);
-	name.Format("%s",namestr);
+	LeaveCriticalSection(&CSwitchApp::m_cs_file_eth2);
+	if (found) name.Format("%s",namestr);
+	else name.Format("0x%X",type);
 	
 	return CString(name);
+}
+
+
+WORD CSwitchApp::GetEth2ProtocolNum(CStringA Name)
+{
+	WORD num;
+	char tmp[100], scanstr[50];
+	
+	sprintf(scanstr,"%s\t%%hX",Name);
+	EnterCriticalSection(&CSwitchApp::m_cs_file_eth2);
+	while (fgets(tmp,100,f_eth2) != NULL) if ((strstr(tmp,Name) != NULL) && (sscanf(tmp,scanstr,&num) > 0)) break;
+	rewind(f_eth2);
+	LeaveCriticalSection(&CSwitchApp::m_cs_file_eth2);
+	
+	return num;
+}
+
+
+void CSwitchApp::CreateEth2ProtocolList(void)
+{
+	char tmp[100], namestr[50];
+
+	EnterCriticalSection(&CSwitchApp::m_cs_file_eth2);
+	while (fgets(tmp,100,f_eth2) != NULL) if (sscanf(tmp,"%[^\t]s",namestr) > 0) Eth2ProtocolList.Add(CStringA(namestr));
+	rewind(f_eth2);
+	LeaveCriticalSection(&CSwitchApp::m_cs_file_eth2);
+}
+
+
+int CSwitchApp::FindInEth2ProtocolList(WORD key)
+{
+	int i;
+
+	for (i=0;i < Eth2ProtocolList.GetCount();i++) if (Eth2ProtocolList[i].Compare(CStringA(GetEth2ProtocolName(key))) == 0) return i;
+	return -1;
+}
+
+
+CArray<CStringA> & CSwitchApp::GetEth2ProtocolList(void)
+{
+	return Eth2ProtocolList;
 }
 
 
 CString CSwitchApp::GetIPProtocolName(BYTE type)
 {
-	CStringA name;
 	char tmp[100], scanstr[50];
 	char namestr[50], numstr[10];
+	int found = 0;
+	CStringA name;
 
 	sprintf(scanstr,"%%[^\t]s%u",type);
 	sprintf(numstr,"%u",type);
-	while (fgets(tmp,100,f_ip) != NULL) if ((strstr(tmp,numstr) != NULL) && (sscanf(tmp,scanstr,namestr) > 0)) break;
+	EnterCriticalSection(&CSwitchApp::m_cs_file_ip);
+	while (fgets(tmp,100,f_ip) != NULL) if ((strstr(tmp,numstr) != NULL) && (sscanf(tmp,scanstr,namestr) > 0)) {
+		found  = 1;
+		break;
+	}
 	rewind(f_ip);
-	name.Format("%s",namestr);
+	LeaveCriticalSection(&CSwitchApp::m_cs_file_ip);
+	if (found) name.Format("%s",namestr);
+	else name.Format("%u",type);
 	
 	return CString(name);
 }
 
 
-WORD CSwitchApp::GetPortNumber(char * AppName)
+BYTE CSwitchApp::GetIPProtocolNum(CStringA Name)
 {
 	WORD num;
+	char tmp[100], scanstr[50];
+	
+	sprintf(scanstr,"%s\t%%hu",Name);
+	EnterCriticalSection(&CSwitchApp::m_cs_file_ip);
+	while (fgets(tmp,100,f_ip) != NULL) if ((strstr(tmp,Name) != NULL) && (sscanf(tmp,scanstr,&num) > 0)) break;
+	rewind(f_ip);
+	LeaveCriticalSection(&CSwitchApp::m_cs_file_ip);
+	
+	return num;
+}
+
+
+void CSwitchApp::CreateIPProtocolList(void)
+{
+	char tmp[100], namestr[50];
+
+	EnterCriticalSection(&CSwitchApp::m_cs_file_ip);
+	while (fgets(tmp,100,f_ip) != NULL) if (sscanf(tmp,"%[^\t]s",namestr) > 0) IPProtocolList.Add(CStringA(namestr));
+	rewind(f_ip);
+	LeaveCriticalSection(&CSwitchApp::m_cs_file_ip);
+}
+
+
+int CSwitchApp::FindInIPProtocolList(BYTE key)
+{
+	int i;
+
+	for (i=0;i < IPProtocolList.GetCount();i++) if (IPProtocolList[i].Compare(CStringA(GetIPProtocolName(key))) == 0) return i;
+	return -1;
+}
+
+
+CArray<CStringA> & CSwitchApp::GetIPProtocolList(void)
+{
+	return IPProtocolList;
+}
+
+
+WORD CSwitchApp::GetPortNumber(CStringA AppName)
+{
+	WORD num = 0;
 	char tmp[100], scanstr[50];
 	
 	sprintf(scanstr,"%s\t%%*3c\t%%hu",AppName);
@@ -299,7 +427,83 @@ WORD CSwitchApp::GetPortNumber(char * AppName)
 }
 
 
+CString CSwitchApp::GetAppName(WORD port, int isExtended)
+{
+	char tmp[100], scanstr[50];
+	char namestr[50], numstr[10];
+	int found = 0;
+	CStringA name;
+
+	sprintf(scanstr,"%%[^\t]s%%*3c\t%u",port);
+	sprintf(numstr,"%u",port);
+	while (fgets(tmp,100,f_ports) != NULL) if ((strstr(tmp,numstr) != NULL) && (sscanf(tmp,scanstr,namestr) > 0)) {
+		found = 1;
+		break;
+	}
+	rewind(f_ports);
+	if ((isExtended) && (found)) name.Format("%s (%u)",namestr,port);
+	else if (found) name.Format("%s",namestr);
+	else name.Format("%u",port);
+	
+	return CString(name);
+}
+
+
+void CSwitchApp::CreateTCPAppList(void)
+{
+	char tmp[100], namestr[50];
+
+	while (fgets(tmp,100,f_ports) != NULL) if ((strstr(tmp,"TCP") != NULL) && (sscanf(tmp,"%[^\t]s",namestr) > 0)) TCPAppList.Add(CStringA(namestr));
+	rewind(f_ports);
+}
+
+
+int CSwitchApp::FindInTCPAppList(WORD port)
+{
+	int i;
+
+	for (i=0;i < TCPAppList.GetCount();i++) if (TCPAppList[i].Compare(CStringA(GetAppName(port))) == 0) return i;
+	return -1;
+}
+
+
+void CSwitchApp::CreateUDPAppList(void)
+{
+	char tmp[100], namestr[50];
+
+	while (fgets(tmp,100,f_ports) != NULL) if ((strstr(tmp,"UDP") != NULL) && (sscanf(tmp,"%[^\t]s",namestr) > 0)) UDPAppList.Add(CStringA(namestr));
+	rewind(f_ports);
+}
+
+
+int CSwitchApp::FindInUDPAppList(WORD port)
+{
+	int i;
+
+	for (i=0;i < UDPAppList.GetCount();i++) if (UDPAppList[i].Compare(CStringA(GetAppName(port))) == 0) return i;
+	return -1;
+}
+
+
+CArray<CStringA> & CSwitchApp::GetTCPAppList(void)
+{
+	return TCPAppList;
+}
+
+
+CArray<CStringA> & CSwitchApp::GetUDPAppList(void)
+{
+	return UDPAppList;
+}
+
+
 Stats * CSwitchApp::GetStatistics(void)
 {
 	return SwitchStats;
+}
+
+
+Filter * CSwitchApp::GetFilter(void)
+{
+	return SwitchFilter;
 }

@@ -8,6 +8,7 @@
 #include "FixListCtrl.h"
 #include "MACtable.h"
 #include "Stats.h"
+#include "Filter.h"
 
 #define WM_INSERTTOMAC_MESSAGE WM_APP+100
 #define WM_DELETEFROMMAC_MESSAGE WM_APP+101
@@ -15,6 +16,7 @@
 #define WM_UPDATETIMEOUT_MESSAGE WM_APP+103
 #define WM_INSERTSTAT_MESSAGE WM_APP+104
 #define WM_UPDATESTAT_MESSAGE WM_APP+105
+#define WM_EDITRULE_MESSAGE WM_APP+106
 
 // CSwitchDlg dialog
 class CSwitchDlg : public CDialog
@@ -60,11 +62,15 @@ private:
 
 	CFixListCtrl m_stats;
 	CButton m_statscheckbox;
-	CButton m_statsresetbutton;
+
+	CFixListCtrl m_rules;
+	int AllowCheckBoxes;
 	
+	void AutoResizeColumns(CListCtrl *control);
 	void InitPortsInfo(void);
 	void InitMACtable(void);
 	void InitStatsTable(void);
+	void InitFilterTable(void);
 public:
 	afx_msg void OnPort1ModeChange();
 	afx_msg void OnPort2ModeChange();
@@ -74,6 +80,10 @@ public:
 	afx_msg void OnBnClickedPort2VLANs();
 	afx_msg void OnBnClickedStatscheck();
 	afx_msg void OnBnClickedStatsresetbutton();
+	afx_msg void OnBnClickedRuleAddButton();
+	afx_msg void OnBnClickedRuleEditButton();
+	afx_msg void OnBnClickedRuleRemoveButton();
+	afx_msg void OnBnClickedRuleRemoveAllButton();
 	void InstertToMACTab(StoredMAC s);
 	void DeleteFromMACTab(int index);
 	void ModifyMACTab(int index, StoredMAC s);
@@ -82,6 +92,9 @@ public:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	void InsertStat(int index, Statistic s);
 	void UpdateStat(int index, UINT count);
+	static UINT RuleEditThread(void * pParam);
+	void EditRule(int *index, Rule& r);
+	afx_msg void OnLvnItemchangedList(NMHDR *pNMHDR, LRESULT *pResult);
 protected:
 	afx_msg LRESULT OnInsertToMacMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnDeleteFromMacMessage(WPARAM wParam, LPARAM lParam);
@@ -89,4 +102,5 @@ protected:
 	afx_msg LRESULT OnUpdateTimeoutMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnInsertStatMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnUpdateStatMessage(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT OnEditRuleMessage(WPARAM wParam, LPARAM lParam);
 };

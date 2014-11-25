@@ -85,6 +85,12 @@ void MACtable::Maintain(void)
 }
 
 
+CArray<StoredMAC> & MACtable::GetTable(void)
+{
+	return TableEntry;
+}
+
+
 UINT MACtable::GetTimeOut(void)
 {
 	return TimeOut;

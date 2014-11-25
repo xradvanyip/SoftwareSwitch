@@ -6,6 +6,7 @@
 #include "Switch.h"
 #include "SwitchDlg.h"
 #include "afxdialogex.h"
+#include "RuleDlg.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -18,6 +19,7 @@
 
 CSwitchDlg::CSwitchDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CSwitchDlg::IDD, pParent)
+	, AllowCheckBoxes(0)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -40,7 +42,7 @@ void CSwitchDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_TIMEOUTSPIN, m_timeoutspin);
 	DDX_Control(pDX, IDC_STATSLIST, m_stats);
 	DDX_Control(pDX, IDC_STATSCHECK, m_statscheckbox);
-	DDX_Control(pDX, IDC_STATSRESETBUTTON, m_statsresetbutton);
+	DDX_Control(pDX, IDC_RULESLIST, m_rules);
 }
 
 BEGIN_MESSAGE_MAP(CSwitchDlg, CDialog)
@@ -62,6 +64,12 @@ BEGIN_MESSAGE_MAP(CSwitchDlg, CDialog)
 	ON_MESSAGE(WM_UPDATESTAT_MESSAGE, &CSwitchDlg::OnUpdateStatMessage)
 	ON_BN_CLICKED(IDC_STATSCHECK, &CSwitchDlg::OnBnClickedStatscheck)
 	ON_BN_CLICKED(IDC_STATSRESETBUTTON, &CSwitchDlg::OnBnClickedStatsresetbutton)
+	ON_BN_CLICKED(IDC_RULEADDBUTTON, &CSwitchDlg::OnBnClickedRuleAddButton)
+	ON_BN_CLICKED(IDC_RULEEDITBUTTON, &CSwitchDlg::OnBnClickedRuleEditButton)
+	ON_BN_CLICKED(IDC_RULEREMOVEBUTTON, &CSwitchDlg::OnBnClickedRuleRemoveButton)
+	ON_BN_CLICKED(IDC_RULEREMOVEALLBUTTON, &CSwitchDlg::OnBnClickedRuleRemoveAllButton)
+	ON_MESSAGE(WM_EDITRULE_MESSAGE, &CSwitchDlg::OnEditRuleMessage)
+	ON_NOTIFY(LVN_ITEMCHANGED, IDC_RULESLIST, &CSwitchDlg::OnLvnItemchangedList)
 END_MESSAGE_MAP()
 
 
@@ -80,6 +88,7 @@ BOOL CSwitchDlg::OnInitDialog()
 	InitPortsInfo();
 	InitMACtable();
 	InitStatsTable();
+	InitFilterTable();
 	SetTimer(1,5000,NULL);
 	theApp.StartThreads();
 
@@ -178,6 +187,25 @@ void CSwitchDlg::InitStatsTable(void)
 }
 
 
+void CSwitchDlg::InitFilterTable(void)
+{
+	m_rules.SetExtendedStyle(m_stats.GetExtendedStyle() | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_CHECKBOXES);
+	m_rules.InsertColumn(0,_T(""),LVCFMT_CENTER);
+	m_rules.InsertColumn(1,_T("Policy"),LVCFMT_CENTER);
+	m_rules.InsertColumn(2,_T("Port"),LVCFMT_CENTER);
+	m_rules.InsertColumn(3,_T("In/Out"),LVCFMT_CENTER);
+	m_rules.InsertColumn(4,_T("Source MAC"),LVCFMT_CENTER);
+	m_rules.InsertColumn(5,_T("Destination MAC"),LVCFMT_CENTER);
+	m_rules.InsertColumn(6,_T("Protocol in Eth II"),LVCFMT_CENTER);
+	m_rules.InsertColumn(7,_T("Source IP"),LVCFMT_CENTER);
+	m_rules.InsertColumn(8,_T("Destination IP"),LVCFMT_CENTER);
+	m_rules.InsertColumn(9,_T("Protocol in IP"),LVCFMT_CENTER);
+	m_rules.InsertColumn(10,_T("Layer 7"),LVCFMT_CENTER);
+	
+	AutoResizeColumns(&m_rules);
+}
+
+
 void CSwitchDlg::OnPort1ModeChange()
 {
 	if (m_port1mode.GetCurSel() == 0)
@@ -228,7 +256,7 @@ void CSwitchDlg::OnBnClickedPort1VLANs()
 {
 	// TODO: Add your control notification handler code here
 	CString str;
-	str.Format(_T("%d %d %d %d %d %d"),m_stats.GetColumnWidth(0),m_stats.GetColumnWidth(1),m_stats.GetColumnWidth(2),m_stats.GetColumnWidth(3),m_stats.GetColumnWidth(4),m_stats.GetColumnWidth(5));
+	str.Format(_T("0:%d 1:%d 2:%d 3:%d 4:%d 5:%d 6:%d 7:%d 8:%d 9:%d"),m_rules.GetColumnWidth(0),m_rules.GetColumnWidth(1),m_rules.GetColumnWidth(2),m_rules.GetColumnWidth(3),m_rules.GetColumnWidth(4),m_rules.GetColumnWidth(5),m_rules.GetColumnWidth(6),m_rules.GetColumnWidth(7),m_rules.GetColumnWidth(8),m_rules.GetColumnWidth(9));
 	AfxMessageBox(str);
 }
 
@@ -467,4 +495,186 @@ void CSwitchDlg::OnBnClickedStatsresetbutton()
 	theApp.GetStatistics()->Reset();
 	m_stats.DeleteAllItems();
 	LeaveCriticalSection(&CSwitchApp::m_cs_stats);
+}
+
+
+void CSwitchDlg::AutoResizeColumns(CListCtrl *control)
+{
+	int i, ColumnWidth, HeaderWidth;
+	int columns = control->GetHeaderCtrl()->GetItemCount();
+
+	control->SetRedraw(FALSE);
+	for (i=0;i < columns;i++)
+	{
+		control->SetColumnWidth(i,LVSCW_AUTOSIZE);
+		ColumnWidth = control->GetColumnWidth(i);
+		control->SetColumnWidth(i,LVSCW_AUTOSIZE_USEHEADER);
+		HeaderWidth = control->GetColumnWidth(i);
+		control->SetColumnWidth(i,max(ColumnWidth,HeaderWidth));
+	}
+	control->SetRedraw(TRUE);
+}
+
+
+void CSwitchDlg::OnBnClickedRuleAddButton()
+{
+	AfxBeginThread(CSwitchDlg::RuleEditThread,NULL);
+}
+
+
+void CSwitchDlg::OnBnClickedRuleEditButton()
+{
+	int *index = (int *) malloc(sizeof(int));
+
+	*index = m_rules.GetSelectionMark();
+	AfxBeginThread(CSwitchDlg::RuleEditThread,index);
+}
+
+
+void CSwitchDlg::OnBnClickedRuleRemoveButton()
+{
+	int index = m_rules.GetSelectionMark();
+
+	if (index == -1) AfxMessageBox(_T("No rule was selected!"));
+	else
+	{
+		EnterCriticalSection(&CSwitchApp::m_cs_filter);
+		AllowCheckBoxes = 0;
+		theApp.GetFilter()->Remove(index);
+		m_rules.DeleteItem(index);
+		AllowCheckBoxes = 1;
+		LeaveCriticalSection(&CSwitchApp::m_cs_filter);
+	}
+}
+
+
+void CSwitchDlg::OnBnClickedRuleRemoveAllButton()
+{
+	EnterCriticalSection(&CSwitchApp::m_cs_filter);
+	AllowCheckBoxes = 0;
+	theApp.GetFilter()->RemoveAll();
+	m_rules.DeleteAllItems();
+	LeaveCriticalSection(&CSwitchApp::m_cs_filter);
+}
+
+
+UINT CSwitchDlg::RuleEditThread(void * pParam)
+{
+	CRuleDlg rule_dlg((int *)pParam);
+	
+	if ((pParam) && (*((int *)pParam) == -1)) AfxMessageBox(_T("No rule was selected!"));
+	else rule_dlg.DoModal();
+	
+	return 0;
+}
+
+
+afx_msg LRESULT CSwitchDlg::OnEditRuleMessage(WPARAM wParam, LPARAM lParam)
+{
+	int index;
+	int *indexptr = (int *)wParam;
+	Rule *r = (Rule *)lParam;
+	CString tmp;
+	
+	if (wParam) {
+		index = *((int *)wParam);
+		m_rules.DeleteItem(index);
+		free((int *)wParam);
+	}
+	else index = m_rules.GetItemCount();
+
+	AllowCheckBoxes = 0;
+	m_rules.InsertItem(index,_T(""));
+	
+	if (r->p == ALLOW) m_rules.SetItemText(index,1,_T("permit"));
+	else m_rules.SetItemText(index,1,_T("deny"));
+	
+	if (r->HasPort == 2) tmp.Format(_T("%d"),r->SWport);
+	else tmp.SetString(_T("any"));
+	m_rules.SetItemText(index,2,tmp);
+
+	if (r->HasDirection == 2)
+	{
+		if (r->d == In) m_rules.SetItemText(index,3,_T("in"));
+		else m_rules.SetItemText(index,3,_T("out"));
+	}
+	else m_rules.SetItemText(index,3,_T("any"));
+
+	if (r->HasSrcMAC == 2) tmp.Format(_T("%.2X:%.2X:%.2X:%.2X:%.2X:%.2X"),r->SrcMAC.b[0],r->SrcMAC.b[1],r->SrcMAC.b[2],r->SrcMAC.b[3],r->SrcMAC.b[4],r->SrcMAC.b[5]);
+	else tmp.SetString(_T("any"));
+	m_rules.SetItemText(index,4,tmp);
+
+	if (r->HasDestMAC == 2) tmp.Format(_T("%.2X:%.2X:%.2X:%.2X:%.2X:%.2X"),r->DestMAC.b[0],r->DestMAC.b[1],r->DestMAC.b[2],r->DestMAC.b[3],r->DestMAC.b[4],r->DestMAC.b[5]);
+	else tmp.SetString(_T("any"));
+	m_rules.SetItemText(index,5,tmp);
+
+	if (r->HasLay3Type == 2) m_rules.SetItemText(index,6,theApp.GetEth2ProtocolName(r->Lay3Type));
+	else if (r->HasLay3Type == 1) m_rules.SetItemText(index,6,_T("any"));
+	else m_rules.SetItemText(index,6,_T("-"));
+
+	if (r->HasSrcIP == 2) tmp.Format(_T("%u.%u.%u.%u"),r->SrcIP.b[0],r->SrcIP.b[1],r->SrcIP.b[2],r->SrcIP.b[3]);
+	else if (r->HasSrcIP == 1) tmp.SetString(_T("any"));
+	else tmp.SetString(_T("-"));
+	m_rules.SetItemText(index,7,tmp);
+
+	if (r->HasDestIP == 2) tmp.Format(_T("%u.%u.%u.%u"),r->DestIP.b[0],r->DestIP.b[1],r->DestIP.b[2],r->DestIP.b[3]);
+	else if (r->HasDestIP == 1) tmp.SetString(_T("any"));
+	else tmp.SetString(_T("-"));
+	m_rules.SetItemText(index,8,tmp);
+
+	if (r->HasLay4Type == 2) m_rules.SetItemText(index,9,theApp.GetIPProtocolName(r->Lay4Type));
+	else if (r->HasLay4Type == 1) m_rules.SetItemText(index,9,_T("any"));
+	else m_rules.SetItemText(index,9,_T("-"));
+
+	if (r->HasAppPort == 2) m_rules.SetItemText(index,10,theApp.GetAppName(r->AppPort,1));
+	else if (r->HasAppPort == 1) m_rules.SetItemText(index,10,_T("any"));
+	else m_rules.SetItemText(index,10,_T("-"));
+	
+	AutoResizeColumns(&m_rules);
+
+	if (r->enabled) { ListView_SetCheckState(m_rules,index,TRUE); }
+	else { ListView_SetCheckState(m_rules,index,FALSE); }
+	
+	AllowCheckBoxes = 1;
+	free(r);
+	
+	return 0;
+}
+
+
+void CSwitchDlg::EditRule(int *index, Rule& r)
+{
+	Rule *rptr = (Rule *) malloc(sizeof(Rule));
+	*rptr = r;
+
+	EnterCriticalSection(&CSwitchApp::m_cs_filter);
+	if (!index) theApp.GetFilter()->Add(r);
+	else theApp.GetFilter()->Modify(*index,r);
+	LeaveCriticalSection(&CSwitchApp::m_cs_filter);
+
+	SendMessage(WM_EDITRULE_MESSAGE,(WPARAM)index,(LPARAM)rptr);
+}
+
+
+void CSwitchDlg::OnLvnItemchangedList(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+
+	if ((AllowCheckBoxes) && (pNMLV->uChanged & LVIF_STATE))
+	{
+		switch (pNMLV->uNewState & LVIS_STATEIMAGEMASK)
+		{
+		case INDEXTOSTATEIMAGEMASK(BST_CHECKED + 1):
+			EnterCriticalSection(&CSwitchApp::m_cs_filter);
+			theApp.GetFilter()->SetEnabled(pNMLV->iItem,1);
+			LeaveCriticalSection(&CSwitchApp::m_cs_filter);
+			break;
+		case INDEXTOSTATEIMAGEMASK(BST_UNCHECKED + 1):
+			EnterCriticalSection(&CSwitchApp::m_cs_filter);
+			theApp.GetFilter()->SetEnabled(pNMLV->iItem,0);
+			LeaveCriticalSection(&CSwitchApp::m_cs_filter);
+			break;
+		}
+	}
+	*pResult = 0;
 }
