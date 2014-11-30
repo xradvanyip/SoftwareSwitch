@@ -12,6 +12,7 @@ SwitchPort::SwitchPort(int index)
 	int i;
 
 	Mode = ACCESS;
+	VLAN_ID = 1;
 	for (i=0;i < 6;i++) MACAddrStruct.b[i] = 0x00;
 	FrameBuffer = new Frame();
 }
@@ -132,6 +133,18 @@ void SwitchPort::SetMode(PORT_MODE mode)
 PORT_MODE SwitchPort::GetMode(void)
 {
 	return Mode;
+}
+
+
+WORD SwitchPort::GetVID(void)
+{
+	return (WORD) VLAN_ID;
+}
+
+
+void SwitchPort::SetVID(int vid)
+{
+	VLAN_ID = vid;
 }
 
 

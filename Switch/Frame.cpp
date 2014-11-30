@@ -5,6 +5,7 @@
 Frame::Frame(void)
 	: frame(NULL)
 	, length(0)
+	, VLAN_ID(-1)
 {
 }
 
@@ -35,6 +36,9 @@ void Frame::GetFrame(void)
 	frame = FrameToExtract->FrameData;
 
 	free(FrameToExtract);
+
+	if ((length >= 18) && (MergeBytes(frame[12],frame[13]) == 0x8100)) VLAN_ID = (int) MergeBytes(frame[14] & 0x0F,frame[15]);
+	else VLAN_ID = -1;
 }
 
 
@@ -144,4 +148,53 @@ IPaddr Frame::GetDestIPaddr(void)
 	
 	for (i=30;i < 34;i++) dest.b[i-30] = frame[i];
 	return dest;
+}
+
+
+int Frame::IsTagged(void)
+{
+	if (VLAN_ID == -1) return 0;
+	return 1;
+}
+
+
+WORD Frame::GetVID(void)
+{
+	return (WORD) VLAN_ID;
+}
+
+
+void Frame::Tag(WORD vid)
+{
+	u_char *TaggedFrame;
+	
+	if ((!frame) || (length < 14)) return;
+	TaggedFrame = (u_char *) malloc(length+4);
+	memcpy(TaggedFrame,frame,12);
+	TaggedFrame[12] = 0x81;
+	TaggedFrame[13] = 0x00;
+	TaggedFrame[14] = GetUpperByte(vid);
+	TaggedFrame[15] = GetLowerByte(vid);
+	memcpy(TaggedFrame+16,frame+12,length-12);
+
+	length += 4;
+	VLAN_ID = (int) vid;
+	free(frame);
+	frame = TaggedFrame;
+}
+
+
+void Frame::UnTag(void)
+{
+	u_char *UnTaggedFrame;
+	
+	if ((!frame) || (length < 18)) return;
+	UnTaggedFrame = (u_char *) malloc(length-4);
+	memcpy(UnTaggedFrame,frame,12);
+	memcpy(UnTaggedFrame+12,frame+16,length-16);
+
+	length -= 4;
+	VLAN_ID = -1;
+	free(frame);
+	frame = UnTaggedFrame;
 }

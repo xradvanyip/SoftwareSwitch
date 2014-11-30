@@ -16,6 +16,7 @@
 #include "Frame.h"
 #include "Stats.h"
 #include "Filter.h"
+#include "VLANList.h"
 
 
 struct SendThreadParam {
@@ -46,6 +47,7 @@ private:
 	MACtable *MACTab;
 	Stats *SwitchStats;
 	Filter *SwitchFilter;
+	VLANList *SwitchVLANList;
 	FILE *f_eth2;
 	FILE *f_ip;
 	FILE *f_ports;
@@ -57,6 +59,7 @@ public:
 	static CRITICAL_SECTION m_cs_mactable;
 	static CRITICAL_SECTION m_cs_stats;
 	static CRITICAL_SECTION m_cs_filter;
+	static CRITICAL_SECTION m_cs_vlan;
 	static CRITICAL_SECTION m_cs_file_eth2;
 	static CRITICAL_SECTION m_cs_file_ip;
 	BOOL stats_enabled;
@@ -88,6 +91,7 @@ public:
 	CArray<CStringA> & GetUDPAppList(void);
 	Stats * GetStatistics(void);
 	Filter * GetFilter(void);
+	VLANList * GetVLANlist(void);
 };
 
 extern CSwitchApp theApp;

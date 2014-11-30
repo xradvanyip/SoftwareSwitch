@@ -118,6 +118,7 @@
     <ClInclude Include="SwitchDlg.h" />
     <ClInclude Include="SwitchPort.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="VLANList.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Filter.cpp" />
@@ -134,6 +135,7 @@
     <ClCompile Include="Switch.cpp" />
     <ClCompile Include="SwitchDlg.cpp" />
     <ClCompile Include="SwitchPort.cpp" />
+    <ClCompile Include="VLANList.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Switch.rc" />

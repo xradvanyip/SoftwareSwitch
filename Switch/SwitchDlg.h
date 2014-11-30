@@ -65,12 +65,16 @@ private:
 
 	CFixListCtrl m_rules;
 	int AllowCheckBoxes;
+
+	CFixListCtrl m_vlanlist;
+	CSpinButtonCtrl m_VIDspin;
 	
 	void AutoResizeColumns(CListCtrl *control);
 	void InitPortsInfo(void);
 	void InitMACtable(void);
 	void InitStatsTable(void);
 	void InitFilterTable(void);
+	void InitVLANlist(void);
 public:
 	afx_msg void OnPort1ModeChange();
 	afx_msg void OnPort2ModeChange();
@@ -103,4 +107,6 @@ protected:
 	afx_msg LRESULT OnInsertStatMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnUpdateStatMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg LRESULT OnEditRuleMessage(WPARAM wParam, LPARAM lParam);
+public:
+	afx_msg void OnBnClickedVlanAddButton();
 };

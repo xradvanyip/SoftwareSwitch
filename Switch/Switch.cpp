@@ -42,6 +42,7 @@ CSwitchApp theApp;
 CRITICAL_SECTION CSwitchApp::m_cs_mactable;
 CRITICAL_SECTION CSwitchApp::m_cs_stats;
 CRITICAL_SECTION CSwitchApp::m_cs_filter;
+CRITICAL_SECTION CSwitchApp::m_cs_vlan;
 CRITICAL_SECTION CSwitchApp::m_cs_file_eth2;
 CRITICAL_SECTION CSwitchApp::m_cs_file_ip;
 
@@ -84,6 +85,7 @@ BOOL CSwitchApp::InitInstance()
 	InitializeCriticalSection(&m_cs_mactable);
 	InitializeCriticalSection(&m_cs_stats);
 	InitializeCriticalSection(&m_cs_filter);
+	InitializeCriticalSection(&m_cs_vlan);
 	InitializeCriticalSection(&m_cs_file_eth2);
 	InitializeCriticalSection(&m_cs_file_ip);
 	MACTab = new MACtable();
@@ -91,6 +93,7 @@ BOOL CSwitchApp::InitInstance()
 	Port2 = new SwitchPort(2);
 	SwitchStats = new Stats();
 	SwitchFilter = new Filter();
+	SwitchVLANList = new VLANList();
 	
 	f_eth2 = fopen("ethernet2_protocols.txt","r");
 	f_ip = fopen("ip_protocols.txt","r");
@@ -204,13 +207,14 @@ UINT CSwitchApp::SendThread(void * pParam)
 	SendThreadParam *p = (SendThreadParam *) pParam;
 	SwitchPort *in_port = p->in_port;
 	SwitchPort *out_port = p->out_port;
+	VLANList *vlan_list = theApp.GetVLANlist();
 	MACtable *table = theApp.GetMACtab();
 	Frame *buffer = in_port->GetBuffer();
 	Stats *stats = theApp.GetStatistics();
 	Filter *filter = theApp.GetFilter();
 	pcap_t *handle = p->handle;
 	CStringA errorstring;
-	int retval = 0;
+	int retval = 0, DropIt;
 	MACaddr src, dest, local = in_port->GetMACAddrStruct();
 	
 	while (TRUE)
@@ -236,26 +240,81 @@ UINT CSwitchApp::SendThread(void * pParam)
 		// if destination MAC address is on same port, the frame is not sent out
 		if (retval == in_port->GetIndex()) continue;
 		
+		DropIt = 0;
+		EnterCriticalSection(&CSwitchApp::m_cs_vlan);
+		// rules for incoming ACCESS port
+		if (in_port->GetMode() == ACCESS)
+		{
+			if (buffer->IsTagged()) {
+				if (buffer->GetVID() != in_port->GetVID()) DropIt = 1;
+				if (out_port->GetMode() == ACCESS) buffer->UnTag();
+			}
+		}
+
+		// rules for incoming TRUNK port
+		if (in_port->GetMode() == TRUNK)
+		{
+			if ((buffer->IsTagged()) && (!vlan_list->IsAllowedForTrunk(buffer->GetVID(),in_port->GetIndex()))) DropIt = 1;
+		}
+		LeaveCriticalSection(&CSwitchApp::m_cs_vlan);
+		if (DropIt == 1) continue;
+		
 		EnterCriticalSection(&CSwitchApp::m_cs_filter);
+		// comparison of frame with input rules
 		retval = filter->Check(in_port->GetIndex(),In,buffer);
 		LeaveCriticalSection(&CSwitchApp::m_cs_filter);
 		if (!retval) continue;
 		
 		EnterCriticalSection(&CSwitchApp::m_cs_stats);
+		// create statistics for the incoming frame
 		if (theApp.stats_enabled) stats->Add(in_port->GetIndex(),In,buffer);
 		LeaveCriticalSection(&CSwitchApp::m_cs_stats);
 
-		//...
+		DropIt = 0;
+		EnterCriticalSection(&CSwitchApp::m_cs_vlan);
+		// rules for outgoing ACCESS port
+		if (out_port->GetMode() == ACCESS)
+		{
+			if ((in_port->GetMode() == ACCESS) && (in_port->GetVID() != out_port->GetVID())) DropIt = 1;
+			if (in_port->GetMode() == TRUNK) {
+				if (buffer->IsTagged()) {
+					if (buffer->GetVID() != out_port->GetVID()) DropIt = 1;
+					buffer->UnTag();
+				}
+				else if (out_port->GetVID() != 1) DropIt = 1;
+			}
+		}
+
+		// rules for outgoing TRUNK port
+		if (out_port->GetMode() == TRUNK)
+		{
+			if (buffer->IsTagged()) {
+				if (!vlan_list->IsAllowedForTrunk(buffer->GetVID(),out_port->GetIndex())) DropIt = 1;
+			}
+			else if (in_port->GetMode() == ACCESS) {
+				if (!vlan_list->IsAllowedForTrunk(in_port->GetVID(),out_port->GetIndex())) DropIt = 1;
+				if (buffer->GetLength() <= 1510) buffer->Tag(in_port->GetVID());
+			}
+			else {
+				if (!vlan_list->IsAllowedForTrunk(1,out_port->GetVID())) DropIt = 1;
+				if (buffer->GetLength() <= 1510) buffer->Tag(1);
+			}
+		}
+		LeaveCriticalSection(&CSwitchApp::m_cs_vlan);
+		if (DropIt == 1) continue;
 
 		EnterCriticalSection(&CSwitchApp::m_cs_filter);
+		// comparison of frame with output rules
 		retval = filter->Check(out_port->GetIndex(),Out,buffer);
 		LeaveCriticalSection(&CSwitchApp::m_cs_filter);
 		if (!retval) continue;
 
 		EnterCriticalSection(&CSwitchApp::m_cs_stats);
+		// create statistics for the outgoing frame
 		if (theApp.stats_enabled) stats->Add(out_port->GetIndex(),Out,buffer);
 		LeaveCriticalSection(&CSwitchApp::m_cs_stats);
-
+				
+		// the frame wasnt dropped, so it can be sent out
 		retval = pcap_sendpacket(handle,buffer->GetData(),buffer->GetLength());
 		if (retval != 0) break;
 	}
@@ -506,4 +565,10 @@ Stats * CSwitchApp::GetStatistics(void)
 Filter * CSwitchApp::GetFilter(void)
 {
 	return SwitchFilter;
+}
+
+
+VLANList * CSwitchApp::GetVLANlist(void)
+{
+	return SwitchVLANList;
 }

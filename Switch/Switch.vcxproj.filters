@@ -57,6 +57,9 @@
     <ClInclude Include="RuleDlg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="VLANList.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Switch.cpp">
@@ -90,6 +93,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="RuleDlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VLANList.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

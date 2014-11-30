@@ -19,6 +19,7 @@ private:
 	CString MACAddress;
 	MACaddr MACAddrStruct;
 	PORT_MODE Mode;
+	int VLAN_ID;
 	static PIP_ADAPTER_ADDRESSES AdaptersInfoBuffer;
 	Frame *FrameBuffer;
 public:
@@ -33,6 +34,8 @@ public:
 	int GetIndex(void);
 	void SetMode(PORT_MODE mode);
 	PORT_MODE GetMode(void);
+	WORD GetVID(void);
+	void SetVID(int vid);
 	MACaddr GetMACAddrStruct(void);
 	Frame * GetBuffer(void);
 };

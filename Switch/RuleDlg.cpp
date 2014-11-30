@@ -67,6 +67,7 @@ BOOL CRuleDlg::OnInitDialog()
 	
 	if (!index)
 	{
+		SetWindowTextW(_T("Add Rule"));
 		m_EnableCheckBox.SetCheck(BST_CHECKED);
 		m_PolicyCombo.SetCurSel(0);
 		m_PortCombo.SetCurSel(0);

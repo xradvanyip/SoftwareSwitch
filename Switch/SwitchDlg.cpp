@@ -43,6 +43,8 @@ void CSwitchDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_STATSLIST, m_stats);
 	DDX_Control(pDX, IDC_STATSCHECK, m_statscheckbox);
 	DDX_Control(pDX, IDC_RULESLIST, m_rules);
+	DDX_Control(pDX, IDC_VLANLIST, m_vlanlist);
+	DDX_Control(pDX, IDC_VLANIDSPIN, m_VIDspin);
 }
 
 BEGIN_MESSAGE_MAP(CSwitchDlg, CDialog)
@@ -70,6 +72,7 @@ BEGIN_MESSAGE_MAP(CSwitchDlg, CDialog)
 	ON_BN_CLICKED(IDC_RULEREMOVEALLBUTTON, &CSwitchDlg::OnBnClickedRuleRemoveAllButton)
 	ON_MESSAGE(WM_EDITRULE_MESSAGE, &CSwitchDlg::OnEditRuleMessage)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_RULESLIST, &CSwitchDlg::OnLvnItemchangedList)
+	ON_BN_CLICKED(IDC_VLANADDBUTTON, &CSwitchDlg::OnBnClickedVlanAddButton)
 END_MESSAGE_MAP()
 
 
@@ -89,6 +92,7 @@ BOOL CSwitchDlg::OnInitDialog()
 	InitMACtable();
 	InitStatsTable();
 	InitFilterTable();
+	InitVLANlist();
 	SetTimer(1,5000,NULL);
 	theApp.StartThreads();
 
@@ -206,8 +210,31 @@ void CSwitchDlg::InitFilterTable(void)
 }
 
 
+void CSwitchDlg::InitVLANlist(void)
+{
+	m_vlanlist.SetExtendedStyle(m_vlanlist.GetExtendedStyle() | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_CHECKBOXES);
+	m_vlanlist.InsertColumn(0,_T(""),LVCFMT_CENTER,25);
+	m_vlanlist.InsertColumn(1,_T("VID"),LVCFMT_CENTER,36);
+	m_vlanlist.InsertColumn(2,_T("T1"),LVCFMT_CENTER,25);
+	m_vlanlist.InsertColumn(3,_T("T2"),LVCFMT_CENTER,25);
+		
+	m_VIDspin.SetBuddy(GetDlgItem(IDC_VLANID));
+	m_VIDspin.SetRange32(2,4095);
+	m_VIDspin.SetPos(2);
+
+	theApp.GetVLANlist()->Add(1,1,1);
+	m_vlanlist.InsertItem(0,_T(""));
+	m_vlanlist.SetItemText(0,1,_T("1"));
+	m_vlanlist.SetItemText(0,2,_T("*"));
+	m_vlanlist.SetItemText(0,3,_T("*"));
+
+	ListView_SetCheckState(m_vlanlist,0,TRUE);
+}
+
+
 void CSwitchDlg::OnPort1ModeChange()
 {
+	EnterCriticalSection(&CSwitchApp::m_cs_vlan);
 	if (m_port1mode.GetCurSel() == 0)
 	{
 		theApp.GetPort1()->SetMode(ACCESS);
@@ -220,11 +247,13 @@ void CSwitchDlg::OnPort1ModeChange()
 		m_port1accessvlan.EnableWindow(FALSE);
 		m_port1vlansbutton.EnableWindow(TRUE);
 	}
+	LeaveCriticalSection(&CSwitchApp::m_cs_vlan);
 }
 
 
 void CSwitchDlg::OnPort2ModeChange()
 {
+	EnterCriticalSection(&CSwitchApp::m_cs_vlan);
 	if (m_port2mode.GetCurSel() == 0)
 	{
 		theApp.GetPort2()->SetMode(ACCESS);
@@ -237,35 +266,61 @@ void CSwitchDlg::OnPort2ModeChange()
 		m_port2accessvlan.EnableWindow(FALSE);
 		m_port2vlansbutton.EnableWindow(TRUE);
 	}
+	LeaveCriticalSection(&CSwitchApp::m_cs_vlan);
 }
 
 
 void CSwitchDlg::OnPort1VLANChange()
 {
-	// TODO: Add your control notification handler code here
+	EnterCriticalSection(&CSwitchApp::m_cs_vlan);
+	theApp.GetPort1()->SetVID(theApp.GetVLANlist()->GetVID(m_port1accessvlan.GetCurSel()));
+	LeaveCriticalSection(&CSwitchApp::m_cs_vlan);
 }
 
 
 void CSwitchDlg::OnPort2VLANChange()
 {
-	// TODO: Add your control notification handler code here
+	EnterCriticalSection(&CSwitchApp::m_cs_vlan);
+	theApp.GetPort2()->SetVID(theApp.GetVLANlist()->GetVID(m_port2accessvlan.GetCurSel()));
+	LeaveCriticalSection(&CSwitchApp::m_cs_vlan);
 }
 
 
 void CSwitchDlg::OnBnClickedPort1VLANs()
 {
-	// TODO: Add your control notification handler code here
-	CString str;
-	str.Format(_T("0:%d 1:%d 2:%d 3:%d 4:%d 5:%d 6:%d 7:%d 8:%d 9:%d"),m_rules.GetColumnWidth(0),m_rules.GetColumnWidth(1),m_rules.GetColumnWidth(2),m_rules.GetColumnWidth(3),m_rules.GetColumnWidth(4),m_rules.GetColumnWidth(5),m_rules.GetColumnWidth(6),m_rules.GetColumnWidth(7),m_rules.GetColumnWidth(8),m_rules.GetColumnWidth(9));
-	AfxMessageBox(str);
+	int i;
+	BOOL IsChecked;
+	
+	EnterCriticalSection(&CSwitchApp::m_cs_vlan);
+	for (i=0;i < m_vlanlist.GetItemCount();i++)
+	{
+		IsChecked = ListView_GetCheckState(m_vlanlist,i);
+		theApp.GetVLANlist()->UpdateAllowedVLANs(i,1,IsChecked);
+		if (IsChecked) m_vlanlist.SetItemText(i,2,_T("*"));
+		else m_vlanlist.SetItemText(i,2,_T(""));
+		ListView_SetCheckState(m_vlanlist,i,TRUE);
+
+	}
+	LeaveCriticalSection(&CSwitchApp::m_cs_vlan);
 }
 
 
 void CSwitchDlg::OnBnClickedPort2VLANs()
 {
-	// TODO: Add your control notification handler code here
-	theApp.GetMACtab()->Add(1,theApp.GetPort1()->GetMACAddrStruct());
-	theApp.GetMACtab()->Add(2,theApp.GetPort2()->GetMACAddrStruct());
+	int i;
+	BOOL IsChecked;
+	
+	EnterCriticalSection(&CSwitchApp::m_cs_vlan);
+	for (i=0;i < m_vlanlist.GetItemCount();i++)
+	{
+		IsChecked = ListView_GetCheckState(m_vlanlist,i);
+		theApp.GetVLANlist()->UpdateAllowedVLANs(i,2,IsChecked);
+		if (IsChecked) m_vlanlist.SetItemText(i,3,_T("*"));
+		else m_vlanlist.SetItemText(i,3,_T(""));
+		ListView_SetCheckState(m_vlanlist,i,TRUE);
+
+	}
+	LeaveCriticalSection(&CSwitchApp::m_cs_vlan);
 }
 
 
@@ -679,4 +734,34 @@ void CSwitchDlg::OnLvnItemchangedList(NMHDR *pNMHDR, LRESULT *pResult)
 		}
 	}
 	*pResult = 0;
+}
+
+
+void CSwitchDlg::OnBnClickedVlanAddButton()
+{
+	int retval;
+	int newVID = (int) GetDlgItemInt(IDC_VLANID,NULL,0);
+	int index = m_vlanlist.GetItemCount();
+	CString tmp;
+
+	EnterCriticalSection(&CSwitchApp::m_cs_vlan);
+	retval = theApp.GetVLANlist()->Add(newVID,1,1);
+	LeaveCriticalSection(&CSwitchApp::m_cs_vlan);
+
+	if (retval) AfxMessageBox(_T("The selected VLAN ID is already exists!"));
+	else
+	{
+		m_vlanlist.InsertItem(index,_T(""));
+
+		tmp.Format(_T("%d"),newVID);
+		m_vlanlist.SetItemText(index,1,tmp);
+		m_vlanlist.SetItemText(index,2,_T("*"));
+		m_vlanlist.SetItemText(index,3,_T("*"));
+
+		tmp.Format(_T("VLAN %d"),newVID);
+		m_port1accessvlan.AddString(tmp);
+		m_port2accessvlan.AddString(tmp);
+
+		ListView_SetCheckState(m_vlanlist,index,TRUE);
+	}
 }

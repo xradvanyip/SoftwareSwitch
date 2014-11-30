@@ -27,6 +27,7 @@ private:
 	unbounded_buffer<BufferedFrame *> buffer;
 	u_char *frame;
 	u_int length;
+	int VLAN_ID;
 public:
 	void AddFrame(u_int length, const u_char *data);
 	void GetFrame(void);
@@ -44,5 +45,9 @@ public:
 	WORD GetLay4DestPort(void);
 	IPaddr GetSrcIPaddr(void);
 	IPaddr GetDestIPaddr(void);
+	int IsTagged(void);
+	WORD GetVID(void);
+	void Tag(WORD vid);
+	void UnTag(void);
 };
 
