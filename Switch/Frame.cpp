@@ -96,38 +96,58 @@ BYTE Frame::GetLowerByte(WORD number)
 
 FRAME_TYPE Frame::GetType(void)
 {
-	if (frame[12] >= 0x06) return ETH2;
-	else if ((frame[14] == 0xFF) && (frame[15] == 0xFF)) return RAW;
-	else if ((frame[14] == 0xAA) && (frame[15] == 0xAA) && (frame[16] == 0x03)) return SNAP;
-	else return LLC;
+	if (VLAN_ID == -1)
+	{
+		if (frame[12] >= 0x06) return ETH2;
+		else if ((frame[14] == 0xFF) && (frame[15] == 0xFF)) return RAW;
+		else if ((frame[14] == 0xAA) && (frame[15] == 0xAA) && (frame[16] == 0x03)) return SNAP;
+		else return LLC;
+	}
+	else
+	{
+		if (frame[12+DOT1Q_LEN] >= 0x06) return ETH2;
+		else if ((frame[14+DOT1Q_LEN] == 0xFF) && (frame[15+DOT1Q_LEN] == 0xFF)) return RAW;
+		else if ((frame[14+DOT1Q_LEN] == 0xAA) && (frame[15+DOT1Q_LEN] == 0xAA) && (frame[16+DOT1Q_LEN] == 0x03)) return SNAP;
+		else return LLC;
+	}
 }
 
 
 WORD Frame::GetLay3Type(void)
 {
-	return MergeBytes(frame[12],frame[13]);
+	if (VLAN_ID == -1) return MergeBytes(frame[12],frame[13]);
+	return MergeBytes(frame[12+DOT1Q_LEN],frame[13+DOT1Q_LEN]);
 }
 
 
 BYTE Frame::GetLay4Type(void)
 {
-	return frame[23];
+	if (VLAN_ID == -1) return frame[23];
+	return frame[23+DOT1Q_LEN];
 }
 
 
 WORD Frame::GetLay4SrcPort(void)
 {
-	int IP_header_length = (frame[14] & 0x0F) * 4;
+	int IP_header_length;
 
-	return MergeBytes(frame[ETH2_HDR_LEN+IP_header_length],frame[ETH2_HDR_LEN+IP_header_length+1]);
+	if (VLAN_ID == -1) IP_header_length = (frame[14] & 0x0F) * 4;
+	else IP_header_length = (frame[14+DOT1Q_LEN] & 0x0F) * 4;
+
+	if (VLAN_ID == -1) return MergeBytes(frame[ETH2_HDR_LEN+IP_header_length],frame[ETH2_HDR_LEN+IP_header_length+1]);
+	return MergeBytes(frame[ETH2_HDR_LEN+DOT1Q_LEN+IP_header_length],frame[ETH2_HDR_LEN+DOT1Q_LEN+IP_header_length+1]);
 }
 
 
 WORD Frame::GetLay4DestPort(void)
 {
-	int IP_header_length = (frame[14] & 0x0F) * 4;
+	int IP_header_length;
+
+	if (VLAN_ID == -1) IP_header_length = (frame[14] & 0x0F) * 4;
+	else IP_header_length = (frame[14+DOT1Q_LEN] & 0x0F) * 4;
 	
-	return MergeBytes(frame[ETH2_HDR_LEN+IP_header_length+2],frame[ETH2_HDR_LEN+IP_header_length+3]);
+	if (VLAN_ID == -1) return MergeBytes(frame[ETH2_HDR_LEN+IP_header_length+2],frame[ETH2_HDR_LEN+IP_header_length+3]);
+	return MergeBytes(frame[ETH2_HDR_LEN+DOT1Q_LEN+IP_header_length+2],frame[ETH2_HDR_LEN+DOT1Q_LEN+IP_header_length+3]);
 }
 
 
@@ -136,7 +156,8 @@ IPaddr Frame::GetSrcIPaddr(void)
 	IPaddr src;
 	int i;
 	
-	for (i=26;i < 30;i++) src.b[i-26] = frame[i];
+	if (VLAN_ID == -1) for (i=26;i < 30;i++) src.b[i-26] = frame[i];
+	else for (i=(26+DOT1Q_LEN);i < (30+DOT1Q_LEN);i++) src.b[i-(26+DOT1Q_LEN)] = frame[i];
 	return src;
 }
 
@@ -146,7 +167,8 @@ IPaddr Frame::GetDestIPaddr(void)
 	IPaddr dest;
 	int i;
 	
-	for (i=30;i < 34;i++) dest.b[i-30] = frame[i];
+	if (VLAN_ID == -1) for (i=30;i < 34;i++) dest.b[i-30] = frame[i];
+	else for (i=(30+DOT1Q_LEN);i < (34+DOT1Q_LEN);i++) dest.b[i-(30+DOT1Q_LEN)] = frame[i];
 	return dest;
 }
 

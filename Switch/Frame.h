@@ -4,6 +4,7 @@
 #include "MACtable.h"
 
 #define ETH2_HDR_LEN 14
+#define DOT1Q_LEN 4
 
 using namespace Concurrency;
 
